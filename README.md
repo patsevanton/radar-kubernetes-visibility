@@ -6,7 +6,7 @@
 
 [Radar](https://github.com/skyhook-io/radar) — open-source UI для Kubernetes от Skyhook (YC W23). Один бинарник на Go, никакого аккаунта, бесплатный навсегда. Топология кластера, браузер ресурсов, timeline событий, менеджер Helm-релизов, GitOps для Argo CD и Flux, карта трафика, аудит безопасности, анализ impact'а перед апгрейдом K8s и даже встроенный MCP-сервер, чтобы ИИ-агенты могли смотреть кластер глазами Radar вместо сырого kubectl.
 
-В этой статье мы запустим Radar локально за 30 секунд, затем развернём его в Yandex Managed Kubernetes через Helm — с ingress-nginx, TLS от cert-manager и доменом из публичного IP — и разберём все основные экраны.
+В этой статье мы запустим Radar локально за 30 секунд, затем развернём его в Yandex Managed Kubernetes через Helm — с ingress-nginx, TLS от cert-manager и доменом из публичного IP — и разберём все основные экраны. Разворачиваемый инстанс — общий для команды разработчиков, поэтому конфигурация строго read-only: все write-права выключены, ИИ-агенты подключаются к read-only MCP.
 
 ## Radar vs Kubernetes Dashboard vs Lens vs Headlamp vs k9s
 
@@ -17,7 +17,7 @@
 | Аккаунт / облако | Не нужен | Не нужен | Нужен Lens-аккаунт (IDE-функции) | Не нужен | Не нужен |
 | Топология-граф | ✅ (Resources + Traffic) | ❌ | Платно (Lens Charts/Paid) | ❌ | ❌ |
 | Timeline изменений | ✅ (memory/sqlite) | ❌ | ❌ | ❌ | ❌ |
-| Helm: diff ревизий, upgrade/rollback из UI | ✅ | ❌ | Частично | ❌ | ❌ |
+| Helm: diff ревизий | ✅ | ❌ | Частично | ❌ | ❌ |
 | GitOps (Argo CD + Flux) | ✅ | ❌ | Частично (расширения) | Частично (плагины) | ❌ |
 | Карта трафика (Hubble/Istio/Beyla/Caretta) | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Аудит best practices (31 проверка) | ✅ | ❌ | ❌ | ❌ | ❌ |
@@ -131,24 +131,14 @@ helm repo update
 helm search repo skyhook/radar --versions
 ```
 
-### Шаг 2. Basic-auth через ingress-nginx
+### Шаг 2. Аутентификация
 
-Radar в in-cluster режиме слушает `0.0.0.0`, поэтому перед ним обязательно должна быть аутентификация. Самый быстрый вариант — basic auth на уровне ingress-nginx.
+Radar в in-cluster режиме слушает `0.0.0.0`, поэтому перед ним обязательно должна быть аутентификация. Варианты:
 
-> Для продакшена лучше встроенные режимы Radar: `auth.mode: proxy` (oauth2-proxy / Pomerium / Cloudflare Access) или `auth.mode: oidc` (Google, Okta, Dex, Keycloak) — тогда у каждого пользователя свой RBAC через Kubernetes impersonation. Для демо достаточно basic auth.
+- **Basic auth** на уровне ingress-nginx (`nginx.ingress.io/auth-type: basic` + Secret с htpasswd) — самый быстрый способ закрыть UI
+- **OIDC** (`auth.mode: oidc`) — вход через корпоративный IdP (Google, Okta, Dex, Keycloak), у каждого пользователя свой RBAC через Kubernetes impersonation
 
-```bash
-# Генерируем credentials
-htpasswd -nb admin 'your-password' > auth
-
-# Создаём Secret
-kubectl create namespace radar --dry-run=client -o yaml | kubectl apply -f -
-kubectl create secret generic radar-basic-auth \
-  --from-file=auth \
-  -n radar
-
-rm auth
-```
+В примерах ниже используется basic auth через ingress-аннотации.
 
 ### Шаг 3. values-файл
 
@@ -159,9 +149,6 @@ ingress:
   enabled: true
   className: nginx
   annotations:
-    nginx.ingress.kubernetes.io/auth-type: basic
-    nginx.ingress.kubernetes.io/auth-secret: radar-basic-auth
-    nginx.ingress.kubernetes.io/auth-realm: "Radar"
     cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: radar.51-250-10-20.sslip.io
@@ -193,9 +180,9 @@ resources:
 
 Из нестандартного здесь:
 
-- `nginx.ingress.kubernetes.io/auth-*` — basic auth на весь ingress
 - `cert-manager.io/cluster-issuer` — cert-manager выпустит TLS-сертификат Let's Encrypt автоматически
 - `rbac.*` — все опасные права выключены по умолчанию: Radar стартует в read-only режиме (кроме логов — они нужны всегда)
+- Инстанс рассчитан на всех разработчиков: доступ к общему Radar — read-only
 
 ### Шаг 4. Устанавливаем
 
@@ -218,7 +205,7 @@ kubectl get certificate -n radar
 open https://radar.51-250-10-20.sslip.io
 ```
 
-После ввода basic-auth логина и пароля откроется Home-дашборд: здоровье кластера, проблемные поды, warning-события, статус Helm-релизов.
+После ввода учётных данных откроется Home-дашборд: здоровье кластера, проблемные поды, warning-события.
 
 ## Обзор экранов Radar
 
@@ -268,7 +255,8 @@ open https://radar.51-250-10-20.sslip.io
 - Инспекция values, rendered-манифестов, diff ревизий
 - История релиза, отслеживание failed upgrades и rollback-паттернов
 - Диагностика зависших hooks с подами, событиями и логами
-- Upgrade, rollback, uninstall прямо из UI (требует `rbac.helm: true`)
+
+В read-only сетапе этой статьи Radar не может видеть сами Helm-релизы: чарт хранит их в Secrets, а `rbac.secrets: false` — релизы недоступны без opt-in. Upgrade, rollback и uninstall из UI требуют `rbac.helm: true` и в эту конфигурацию не входят.
 
 ### Compare
 
@@ -290,8 +278,9 @@ Diff любых двух ресурсов одного вида side-by-side: st
 - Fleet-вид + детальная страница по каждому приложению (Topology / Changes / Activity)
 - Field-level drift, события, детект застрявших drift-лупов, parsed operation-failures
 - Lifecycle-осознанность: `Terminating`-чипы, zombie-операции
-- Actions: sync, suspend, resume, reconcile, rollback — с lifecycle-защитой
 - При подключении к Argo CD API — Git-rendered desired-vs-live diff (`argocd.existingSecret` в values)
+
+Управляющие действия (sync, suspend, resume, reconcile, rollback) в read-only сетапе статьи недоступны: ClusterRole выдаёт на Argo/Flux-группы только `get/list/watch`, а контроллер с автоматической синхронизацией делает изменения за вас.
 
 ### Traffic
 
@@ -352,14 +341,15 @@ Hop-by-hop диагностика для Service, Ingress, HTTPRoute, GRPCRoute 
 
 Встроенный Model Context Protocol-сервер — пожалуй, самая необычная фича Radar. ИИ-агенты (Claude, Cursor, Copilot, …) смотрят кластер не через сырой kubectl, а через token-оптимизированные данные Radar: топология, health-оценки, дедуплицированные события, отфильтрованные логи.
 
+Для общего Radar на команду разработчиков подключать агентов нужно к read-only mount'у `/mcp-readonly`: он отдаёт только read-инструменты — write-инструменты (restart, scale, sync, …) даже не попадают в каталог, агент их не видит и не может вызвать. Полный mount `/mcp` на общий инстанс не подключайте: он экспортирует write-инструменты (RBAC вернёт 403, но агент будет их предлагать).
+
 - Read-инструменты строго read-only (`readOnlyHint`)
-- Write-инструменты (restart, scale, sync, …) помечены `destructiveHint` и выполняются под кластерным RBAC
 - Secret-данные структурно никогда не отдаются; env-значения и логи скрабятся
 
 Подключение к Claude Code:
 
 ```bash
-claude mcp add radar --transport http http://localhost:9280/mcp
+claude mcp add radar --transport http https://radar.51-250-10-20.sslip.io/mcp-readonly
 ```
 
 Claude Desktop (`claude_desktop_config.json`):
@@ -369,7 +359,7 @@ Claude Desktop (`claude_desktop_config.json`):
   "mcpServers": {
     "radar": {
       "type": "http",
-      "url": "http://localhost:9280/mcp"
+      "url": "https://radar.51-250-10-20.sslip.io/mcp-readonly"
     }
   }
 }
@@ -381,13 +371,13 @@ Cursor (`~/.cursor/mcp.json`):
 {
   "mcpServers": {
     "radar": {
-      "url": "http://localhost:9280/mcp"
+      "url": "https://radar.51-250-10-20.sslip.io/mcp-readonly"
     }
   }
 }
 ```
 
-Всего ~25 инструментов: `issues` («что сломано прямо сейчас?»), `diagnose` (root-cause одного workload'а в один вызов — с логами, событиями и startup-блокерами), `get_topology`, `get_neighborhood`, `list_helm_releases`, `get_cluster_audit`, `query_prometheus`, `manage_workload`, `manage_gitops` и другие.
+Read-only каталог: `issues` («что сломано прямо сейчас?»), `diagnose` (root-cause одного workload'а в один вызов — с логами, событиями и startup-блокерами), `get_topology`, `get_neighborhood`, `list_helm_releases`, `get_cluster_audit`, `query_prometheus` и другие — всего ~25 read-инструментов.
 
 ## RBAC: что по умолчанию, а что opt-in
 
@@ -471,9 +461,12 @@ kubectl get challenges -A
 - Проверить логи cert-manager: `kubectl logs -n cert-manager deploy/cert-manager`
 - Убедиться, что домен резолвится в IP ingress-контроллера: `dig radar.51-250-10-20.sslip.io +short`
 
-### 3. Basic auth не запрашивается
+### 3. Аутентификация не запрашивается
+
+Если закрыли UI basic auth'ом через ingress-аннотации — проверьте, что Secret с htpasswd существует и аннотации применились:
 
 ```bash
+kubectl get ingress -n radar -o jsonpath='{.metadata.annotations}'
 kubectl get secret radar-basic-auth -n radar -o jsonpath='{.data.auth}' | base64 -d
 # Должно быть: admin:$apr1$...
 ```
@@ -493,7 +486,7 @@ Radar нашёл CRD, но RBAC на группу не выдан. Это не �
 
 - Radar читает кластер через ваш kubeconfig / ServiceAccount и держит данные локально — ничего не выгружается в Skyhook
 - Account, agent, cloud-backend не нужны
-- In-cluster обязательно ставьте за аутентификацией: встроенные proxy/OIDC-режимы или хотя бы basic auth
+- In-cluster обязательно ставьте за аутентификацией: basic auth на ingress, встроенные proxy/OIDC-режимы
 - Terminal и port forwarding — значительный доступ, включайте только в доверенной среде
 - Privileged-фичи по умолчанию выключены, всё включается явным `rbac.*` флагом
 
