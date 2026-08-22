@@ -131,7 +131,7 @@ ingress:
   enabled: true
   className: nginx
   hosts:
-    - host: radar.51-250-10-20.sslip.io
+    - host: ваш-fqdn-url
       paths:
         - path: /
           pathType: Prefix
@@ -166,19 +166,6 @@ helm upgrade --install radar skyhook/radar --version 1.11.0 \
   -n radar --create-namespace -f helm-values.yaml \
   --wait --timeout 5m
 ```
-
-### Шаг 5. Проверяем
-
-```bash
-# Ждём готовности пода
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=radar \
-  -n radar --timeout=120s
-
-# Открываем UI
-open http://radar.51-250-10-20.sslip.io
-```
-
-После ввода учётных данных откроется Home-дашборд: здоровье кластера, проблемные поды, warning-события.
 
 ## Обзор экранов Radar
 
