@@ -2,7 +2,7 @@ ingress:
   enabled: true
   className: nginx
   hosts:
-    - host: radar.81.26.185.134.sslip.io
+    - host: ${radar_fqdn}
       paths:
         - path: /
           pathType: Prefix
