@@ -1,0 +1,116 @@
+grafana:
+  ingress:
+    ingressClassName: nginx
+    enabled: true
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    hosts:
+      - grafana.${ingress_public_ip}.sslip.io
+
+defaultDatasources:
+  victoriametrics:
+    datasources:
+      - name: VictoriaMetrics
+        type: prometheus
+        access: proxy
+        isDefault: true
+        jsonData:
+          httpMethod: POST
+          queryTimeout: 300s
+          # Снижает число точек на панель и нагрузку параллельных подзапросов к backend на широких диапазонах.
+          timeInterval: 30s
+
+defaultRules:
+  groups:
+    etcd:
+      enabled: false
+    kubernetes-system-scheduler:
+      enabled: false
+    kubernetes-system-controller-manager:
+      enabled: false
+    # В Yandex Managed K8s kube-scheduler недоступен для скрейпинга,
+    # поэтому recording-правила группы kube-scheduler.rules не имеют данных
+    # и порождают шумный алерт RecordingRulesNoData.
+    kube-scheduler.rules:
+      enabled: false
+# Control-plane компоненты Yandex Managed K8s (kube-controller-manager, kube-scheduler,
+# kube-etcd) недоступны для скрейпинга — master управляемый и вне кластера.
+# Отключаем scrape-job, иначе vmagent плодит ScrapePoolHasNoTargets,
+# а vmalert — RecordingRulesNoData для пустых scrape-pool.
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+
+# Демо-кластер из 2 нод 2 vCPU/4GB: vmcluster не влезет — один vmsingle.
+# Radar использует Prometheus-бэкенд только для Traffic-карты и query_prometheus,
+# этого достаточно; HA-репликация и шардирование не требуются.
+vmsingle:
+  enabled: true
+  spec:
+    # Диск: метрики кластера (node-exporter, kube-state-metrics, vmagent, сам vmsingle)
+    # ~несколько GiB в месяц; 20Gi с запасом. network-hdd хватит, запись не интенсивная.
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: yc-network-hdd
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1536Mi
+      requests:
+        cpu: 100m
+        memory: 512Mi
+
+vmcluster:
+  enabled: false
+
+# Алерты не ставим: Radar не отображает firing-алерты Alertmanager'а,
+# а ресурсов демо-кластера мало. Алерты — в Grafana UI при необходимости.
+vmalert:
+  enabled: false
+alertmanager:
+  enabled: false
+
+vmagent:
+  spec:
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1Gi
+      requests:
+        cpu: 50m
+        memory: 256Mi
+
+kube-state-metrics:
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 20m
+      memory: 128Mi
+
+prometheus-node-exporter:
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 32Mi
+
+victoria-metrics-operator:
+  resources:
+    limits:
+      cpu: 200m
+      memory: 512Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi

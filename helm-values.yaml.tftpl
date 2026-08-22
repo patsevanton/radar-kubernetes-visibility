@@ -16,6 +16,11 @@ rbac:
 timeline:
   storage: memory
 
+# Prometheus-бэкенд для Traffic-карты, Cost Insights и query_prometheus.
+# vmsingle из victoria-metrics-k8s-stack (см. раздел про vmks в README).
+traffic:
+  prometheusUrl: http://vmsingle-vmks-victoria-metrics-k8s-stack.vmks.svc:8429
+
 resources:
   limits:
     cpu: 500m

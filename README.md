@@ -88,6 +88,31 @@ brew install --cask skyhook-io/tap/radar-desktop
 
 Локальный режим — приватный по дизайну: данные кластера остаются на вашей машине, никуда не выгружаются, аккаунт не нужен.
 
+## VictoriaMetrics до Radar: зачем и как
+
+Функции Traffic-карты, Cost Insights и MCP-инструмент `query_prometheus` требуют PromQL-совместимый бэкенд (Prometheus, VictoriaMetrics, Thanos, Mimir). Cтавим минимальный стек `victoria-metrics-k8s-stack` (vmagent + vmsingle + Grafana) и указываем этот стек в `traffic.prometheusUrl`.
+
+### Шаг 2. Устанавливаем
+
+```bash
+helm upgrade --install vmks oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-k8s-stack \
+  --namespace vmks --create-namespace \
+  --version 0.90.2 \
+  --wait --values vmks-values.yaml
+```
+
+### Шаг 3. Проверяем
+
+```bash
+# Поды стека
+kubectl get pods -n vmks
+
+# Пароль Grafana
+kubectl get secret vmks-grafana -n vmks -o jsonpath='{.data.admin-password}' | base64 --decode; echo
+
+Проверить, что Radar увидел бэкенд, можно в UI на экране Traffic — источник данных подхватится из `traffic.prometheusUrl`, а MCP-инструмент `query_prometheus` начнёт отвечать на PromQL-запросы.
+
+
 ## Часть 2. In-cluster деплой в Yandex Managed K8s
 
 Локальный режим удобен одному человеку. Для командной работы Radar разворачивается в кластер: один под, ClusterIP-сервис, ingress — и весь отдел видит кластер в браузере.
@@ -373,11 +398,11 @@ persistence:
 
 ## Подключение Prometheus (Traffic и Cost)
 
-Для Traffic-карты и Cost Insights нужен Prometheus или VictoriaMetrics. Если автодетект не находит инстанс, укажите URL явно:
+Для Traffic-карты и Cost Insights нужен Prometheus или VictoriaMetrics. Если автодетект не находит инстанс, укажите URL явно — в этой статье бэкенд ставится разделом выше (vmsingle в namespace `vmks`):
 
 ```yaml
 traffic:
-  prometheusUrl: http://vmselect.vmks.svc:8481/select/0/prometheus
+  prometheusUrl: http://vmsingle-vmks-victoria-metrics-k8s-stack.vmks.svc:8429
   # Для защищённых паролем бэкендов — заголовки из Secret:
   # prometheusHeadersFromEnv:
   #   Authorization: PROMETHEUS_TOKEN
@@ -385,59 +410,6 @@ traffic:
 
 `query_prometheus` из MCP и `/prometheus/query` из REST работают с любым PromQL-совместимым бэкендом: Thanos, VictoriaMetrics, Mimir.
 
-## Обновление и удаление
-
-```bash
-# Обновление
-helm repo update skyhook
-helm upgrade radar skyhook/radar -n radar -f helm-values.yaml
-
-# Удаление
-helm uninstall radar -n radar
-kubectl delete namespace radar
-```
-
-## Troubleshooting
-
-### 1. Под не стартует
-
-```bash
-kubectl logs -n radar -l app.kubernetes.io/name=radar
-kubectl describe pod -n radar -l app.kubernetes.io/name=radar
-```
-
-### 2. Домен не резолвится / недоступен
-
-```bash
-dig radar.51-250-10-20.sslip.io +short
-curl -I http://radar.51-250-10-20.sslip.io
-```
-
-Решения:
-
-- Убедиться, что домен резолвится в IP ingress-контроллера: `dig radar.51-250-10-20.sslip.io +short`
-- Проверить, что Service ingress-контроллера имеет внешний IP: `kubectl get svc -n ingress-nginx ingress-nginx-controller`
-
-### 3. Аутентификация не запрашивается
-
-Если закрыли UI basic auth'ом через ingress-аннотации — проверьте, что Secret с htpasswd существует и аннотации применились:
-
-```bash
-kubectl get ingress -n radar -o jsonpath='{.metadata.annotations}'
-kubectl get secret radar-basic-auth -n radar -o jsonpath='{.data.auth}' | base64 -d
-# Должно быть: admin:$apr1$...
-```
-
-### 4. Ingress не работает
-
-```bash
-kubectl get ingress -n radar -o yaml
-kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx
-```
-
-### 5. «Failed to list resource» в UI
-
-Radar нашёл CRD, но RBAC на группу не выдан. Это не ошибка: добавьте группу в `rbac.additionalCrdGroups` или включите конкретную через `rbac.crdGroups.<name>`.
 
 ## Безопасность
 
