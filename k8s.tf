@@ -166,3 +166,8 @@ output "radar_fqdn" {
   description = "FQDN Radar (сформирован через sslip.io из публичного IP балансировщика ingress-nginx)"
   value       = local.radar_fqdn
 }
+
+output "radar_url" {
+  description = "URL Radar за ingress-nginx (http, TLS не настроен)"
+  value       = "http://${local.radar_fqdn}"
+}
