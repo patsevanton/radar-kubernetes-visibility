@@ -102,22 +102,6 @@ brew install --cask skyhook-io/tap/radar-desktop
 
 Никакой базы данных, никаких зависимостей. По умолчанию — один реплика-под (128 MiB request, 512 MiB limit).
 
-### Шаг 0. Домен из публичного IP — sslip.io
-
-Если DNS-зона в Yandex Cloud не настроена, удобнее всего сервис sslip.io: домен формируется прямо из публичного IP балансировщика ingress-контроллера.
-
-```bash
-# Публичный IP ingress-контроллера
-kubectl get svc -n ingress-nginx ingress-nginx-controller \
-  -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-```
-
-Пусть это будет `51.250.10.20` — тогда домен `radar.51-250-10-20.sslip.io` автоматически резолвится в этот IP. Никаких настроек DNS не нужно.
-
-```bash
-export RADAR_FQDN=radar.51-250-10-20.sslip.io
-```
-
 ### Шаг 1. Добавляем Helm-репозиторий
 
 ```bash
@@ -133,12 +117,10 @@ helm search repo skyhook/radar --versions
 
 ### Шаг 2. Аутентификация
 
-Radar в in-cluster режиме слушает `0.0.0.0`, поэтому перед ним обязательно должна быть аутентификация. Варианты:
+Radar может иметь аутентификацию. Варианты:
 
 - **Basic auth** на уровне ingress-nginx (`nginx.ingress.io/auth-type: basic` + Secret с htpasswd) — самый быстрый способ закрыть UI
 - **OIDC** (`auth.mode: oidc`) — вход через корпоративный IdP (Google, Okta, Dex, Keycloak), у каждого пользователя свой RBAC через Kubernetes impersonation
-
-В примерах ниже используется basic auth через ingress-аннотации.
 
 ### Шаг 3. values-файл
 
