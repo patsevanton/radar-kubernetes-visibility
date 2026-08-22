@@ -1,17 +1,11 @@
 ingress:
   enabled: true
   className: nginx
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: radar.81.26.185.134.sslip.io
       paths:
         - path: /
           pathType: Prefix
-  tls:
-    - secretName: radar-tls
-      hosts:
-        - radar.81.26.185.134.sslip.io
 
 rbac:
   podLogs: true    # просмотр логов подов (включён по умолчанию)

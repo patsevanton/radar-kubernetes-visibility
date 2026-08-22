@@ -6,7 +6,7 @@
 
 [Radar](https://github.com/skyhook-io/radar) — open-source UI для Kubernetes от Skyhook (YC W23). Один бинарник на Go, никакого аккаунта, бесплатный навсегда. Топология кластера, браузер ресурсов, timeline событий, менеджер Helm-релизов, GitOps для Argo CD и Flux, карта трафика, аудит безопасности, анализ impact'а перед апгрейдом K8s и даже встроенный MCP-сервер, чтобы ИИ-агенты могли смотреть кластер глазами Radar вместо сырого kubectl.
 
-В этой статье мы запустим Radar локально за 30 секунд, затем развернём его в Yandex Managed Kubernetes через Helm — с ingress-nginx, TLS от cert-manager и доменом из публичного IP — и разберём все основные экраны. Разворачиваемый инстанс — общий для команды разработчиков, поэтому конфигурация строго read-only: все write-права выключены, ИИ-агенты подключаются к read-only MCP.
+В этой статье мы запустим Radar локально за 30 секунд, затем развернём его в Yandex Managed Kubernetes через Helm — с ingress-nginx и доменом из публичного IP — и разберём все основные экраны. Разворачиваемый инстанс — общий для команды разработчиков, поэтому конфигурация строго read-only: все write-права выключены, ИИ-агенты подключаются к read-only MCP.
 
 ## Radar vs Kubernetes Dashboard vs Lens vs Headlamp vs k9s
 
@@ -39,7 +39,7 @@ Radar не заменит Grafana с дашбордами метрик и не �
 - **MCP-сервер** — ИИ-агенты получают кластер в token-оптимизированном виде вместо сырого kubectl
 - **Timeline** — единая лента событий и diff'ов изменений по ресурсам
 
-> Предполагается, что у вас уже есть работающий кластер Yandex Managed Kubernetes с установленным ingress-nginx и cert-manager (ClusterIssuer `letsencrypt-prod`). Как их поставить — описано в любом базовом гайде по Yandex K8s; статья начинается с работающего кластера.
+> Предполагается, что у вас уже есть работающий кластер Yandex Managed Kubernetes с установленным ingress-nginx. Как его поставить — описано в любом базовом гайде по Yandex K8s; статья начинается с работающего кластера.
 
 ## Часть 1. Локальный запуск за 30 секунд
 
@@ -148,17 +148,11 @@ Radar в in-cluster режиме слушает `0.0.0.0`, поэтому пер
 ingress:
   enabled: true
   className: nginx
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: radar.51-250-10-20.sslip.io
       paths:
         - path: /
           pathType: Prefix
-  tls:
-    - secretName: radar-tls
-      hosts:
-        - radar.51-250-10-20.sslip.io
 
 rbac:
   podLogs: true    # просмотр логов подов (включён по умолчанию)
@@ -180,7 +174,6 @@ resources:
 
 Из нестандартного здесь:
 
-- `cert-manager.io/cluster-issuer` — cert-manager выпустит TLS-сертификат Let's Encrypt автоматически
 - `rbac.*` — все опасные права выключены по умолчанию: Radar стартует в read-only режиме (кроме логов — они нужны всегда)
 - Инстанс рассчитан на всех разработчиков: доступ к общему Radar — read-only
 
@@ -198,11 +191,8 @@ helm upgrade --install radar skyhook/radar --version 1.11.0 \
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=radar \
   -n radar --timeout=120s
 
-# TLS-сертификат выпущен?
-kubectl get certificate -n radar
-
 # Открываем UI
-open https://radar.51-250-10-20.sslip.io
+open http://radar.51-250-10-20.sslip.io
 ```
 
 После ввода учётных данных откроется Home-дашборд: здоровье кластера, проблемные поды, warning-события.
@@ -349,7 +339,7 @@ Hop-by-hop диагностика для Service, Ingress, HTTPRoute, GRPCRoute 
 Подключение к Claude Code:
 
 ```bash
-claude mcp add radar --transport http https://radar.51-250-10-20.sslip.io/mcp-readonly
+claude mcp add radar --transport http http://radar.51-250-10-20.sslip.io/mcp-readonly
 ```
 
 Claude Desktop (`claude_desktop_config.json`):
@@ -359,7 +349,7 @@ Claude Desktop (`claude_desktop_config.json`):
   "mcpServers": {
     "radar": {
       "type": "http",
-      "url": "https://radar.51-250-10-20.sslip.io/mcp-readonly"
+      "url": "http://radar.51-250-10-20.sslip.io/mcp-readonly"
     }
   }
 }
@@ -371,7 +361,7 @@ Cursor (`~/.cursor/mcp.json`):
 {
   "mcpServers": {
     "radar": {
-      "url": "https://radar.51-250-10-20.sslip.io/mcp-readonly"
+      "url": "http://radar.51-250-10-20.sslip.io/mcp-readonly"
     }
   }
 }
@@ -446,20 +436,17 @@ kubectl logs -n radar -l app.kubernetes.io/name=radar
 kubectl describe pod -n radar -l app.kubernetes.io/name=radar
 ```
 
-### 2. TLS-сертификат не выпускается
+### 2. Домен не резолвится / недоступен
 
 ```bash
-kubectl get certificate -n radar
-kubectl describe certificate radar-tls -n radar
-kubectl get challenges -A
+dig radar.51-250-10-20.sslip.io +short
+curl -I http://radar.51-250-10-20.sslip.io
 ```
 
 Решения:
 
-- Подождать 1–5 минут — ACME HTTP-01 challenge требует времени
-- Проверить, что ClusterIssuer в статусе Ready: `kubectl get clusterissuer letsencrypt-prod`
-- Проверить логи cert-manager: `kubectl logs -n cert-manager deploy/cert-manager`
 - Убедиться, что домен резолвится в IP ingress-контроллера: `dig radar.51-250-10-20.sslip.io +short`
+- Проверить, что Service ingress-контроллера имеет внешний IP: `kubectl get svc -n ingress-nginx ingress-nginx-controller`
 
 ### 3. Аутентификация не запрашивается
 
