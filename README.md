@@ -163,7 +163,8 @@ resources:
 
 ```bash
 helm upgrade --install radar skyhook/radar --version 1.11.0 \
-  -n radar -f helm-values.yaml
+  -n radar --create-namespace -f helm-values.yaml \
+  --wait --timeout 5m
 ```
 
 ### Шаг 5. Проверяем
