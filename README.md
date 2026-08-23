@@ -124,7 +124,7 @@ Traffic-карта рисует живые сетевые потоки межд�
 - Для сервисного аккаунта кластера обязательна роль `k8s.tunnelClusters.agent` (уже в Terraform-коде)
 - Включается только при создании кластера; перевести существующий кластер на Cilium нельзя
 
-Для подключения Radar к hubble-relay в `helm-values.yaml` включён `rbac.portForward: true`: Radar детектит поды с лейблом `k8s-app=hubble-relay` и читает поток событий через port-forward. Prometheus-бэкенд для Traffic-карты при этом не используется.
+Для подключения Radar к hubble-relay в `radar-values.yaml` включён `rbac.portForward: true`: Radar детектит поды с лейблом `k8s-app=hubble-relay` и читает поток событий через port-forward. Prometheus-бэкенд для Traffic-карты при этом не используется.
 
 Проверяем после создания кластера:
 
@@ -171,7 +171,7 @@ Radar может иметь аутентификацию. Варианты:
 
 ### Шаг 3. values-файл
 
-Файл `helm-values.yaml`:
+Файл `radar-values.yaml`:
 
 ```yaml
 ingress:
@@ -215,7 +215,7 @@ resources:
 
 ```bash
 helm upgrade --install radar skyhook/radar --version 1.11.0 \
-  -n radar --create-namespace -f helm-values.yaml \
+  -n radar --create-namespace -f radar-values.yaml \
   --wait --timeout 5m
 ```
 

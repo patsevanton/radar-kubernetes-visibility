@@ -10,7 +10,7 @@ locals {
   subnet_e_zone = yandex_vpc_subnet.radar-e.zone
 
   # Публичный IP балансировщика ingress-nginx. FQDN Radar формируется через sslip.io
-  # из этого адреса (см. outputs в k8s.tf и helm-values.yaml).
+  # из этого адреса (см. outputs в k8s.tf и radar-values.yaml).
   ingress_public_ip = yandex_vpc_address.addr.external_ipv4_address[0].address
   radar_fqdn        = "radar.${local.ingress_public_ip}.sslip.io"
 }
