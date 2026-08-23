@@ -113,6 +113,33 @@ kubectl get secret vmks-grafana -n vmks -o jsonpath='{.data.admin-password}' | b
 
 Проверить, что Radar увидел бэкенд, можно в UI на экране Traffic — источник данных подхватится из `traffic.prometheusUrl`, а MCP-инструмент `query_prometheus` начнёт отвечать на PromQL-запросы.
 
+## Caretta: источник данных для Traffic-карты
+
+Traffic-карта рисует живые сетевые потоки между сервисами. Radar умеет собирать их из Hubble (Cilium), Istio или Caretta — но Hubble и Istio требуют замены CNI или service mesh, а [Caretta](https://github.com/groundcover-com/caretta) от groundcover ставится поверх любого кластера: eBPF-агент в виде DaemonSet'а без модификации кластера. Требования — Linux kernel ≥ 4.16 и CO-RE (любой современный дистрибутив подходит).
+
+Caretta по умолчанию тащит за собой собственные VictoriaMetrics и Grafana. В этой статье бэкенд у нас уже есть (vmsingle из vmks), поэтому ставим Caretta лёгкой версией — только eBPF-агент — а его метрики vmagent начнёт скрейпить через VMPodScrape, добавленный в `vmks-values.yaml` на предыдущем шаге:
+
+```bash
+helm repo add groundcover https://helm.groundcover.com/
+helm repo update
+helm install caretta --namespace caretta --create-namespace groundcover/caretta \
+  --set victoria-metrics-single.enabled=false \
+  --set grafana.enabled=false
+```
+
+Проверяем:
+
+```bash
+# Агент должен работать на каждой ноде
+kubectl get pods -n caretta
+
+# Метрики Caretta появились в vmsingle (main-метрика — caretta_links_observed)
+kubectl run curl --rm -it --image=curlimages/curl -n vmks --restart=Never -- \
+  curl -s http://vmsingle-vmks-victoria-metrics-k8s-stack.vmks.svc:8429/api/v1/query \
+  --data-urlencode 'query=count(caretta_links_observed)'
+```
+
+После установки откройте в Radar экран **Traffic**: Caretta детектится автоматически (по подам с лейблом `app.kubernetes.io/name=caretta`), и карта заполнится живыми рёбрами — кто с кем реально говорит прямо сейчас. Метрики `caretta_links_observed` видны и в общей Grafana: Explore → datasource VictoriaMetrics.
 
 ## Часть 2. In-cluster деплой в Yandex Managed K8s
 
@@ -277,6 +304,8 @@ Diff любых двух ресурсов одного вида side-by-side: st
 - Фильтры по namespace, протоколу, status code
 - Beyla даёт eBPF L4 + HTTP видимость без service mesh
 - Setup wizard: если источник не найден — предложит установить
+
+В этом кластере источник — Caretta (раздел выше): Radar видит его поды и читает `caretta_links_observed` из vmsingle через `traffic.prometheusUrl`. Рёбра графа утолщаются с ростом throughput и тускнеют, когда трафик останавливается; hover по ребру — p50/p95/p99 latency и top status codes.
 
 ### Capacity (Karpenter)
 
