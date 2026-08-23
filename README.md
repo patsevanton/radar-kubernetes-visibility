@@ -144,8 +144,7 @@ Traffic-карта рисует живые сетевые потоки межд�
 
 - eBPF вместо iptables: сетевые политики L3/L4/L7, фильтрация по DNS-имени
 - Hubble из коробки: наблюдаемость сетевых событий (dropped flows, correlation с NetworkPolicies)
-- Для сервисного аккаунта кластера обязательна роль `k8s.tunnelClusters.agent` (уже в Terraform-коде)
-- Включается только при создании кластера; перевести существующий кластер на Cilium нельзя
+- Для сервисного аккаунта кластера обязательна роль `k8s.tunnelClusters.agent`
 
 Для подключения Radar к hubble-relay в `radar-values.yaml` включён `rbac.portForward: true`: Radar детектит поды с лейблом `k8s-app=hubble-relay` и читает поток событий через port-forward. Prometheus-бэкенд для Traffic-карты при этом не используется.
 
