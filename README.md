@@ -79,6 +79,10 @@ kubectl create namespace opencost --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -f custom-pricing-configmap.yaml
 ```
 
+Ставки в ConfigMap — **почасовые** (₽/час за единицу): `CPU: 1.1529` — это тариф Yandex Cloud за vCPU-час, `RAM: 0.3074` — за ГБ-час. Размерность зависит от версии OpenCost (см. комментарий в `custom-pricing-configmap.yaml`): в **v1.121.0** cost-model перестала делить `CPU`/`RAM`/`GPU`/`storage` на 730 — до этой версии (включая чарт 2.5.29 с образом 1.121.1 — уже новая логика) значения нужно было указывать месячными (₽/мес). Если ставите OpenCost ≤ 1.120.0, умножьте ставки на 730.
+
+Изменение ConfigMap подхватывается только при старте пода — после правки цен выполните `kubectl rollout restart deploy/opencost -n opencost`.
+
 ### Шаг 2. Устанавливаем
 
 ```bash
