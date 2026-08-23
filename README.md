@@ -109,6 +109,7 @@ kubectl get pods -n vmks
 
 # Пароль Grafana
 kubectl get secret vmks-grafana -n vmks -o jsonpath='{.data.admin-password}' | base64 --decode; echo
+```
 
 Проверить, что Radar увидел бэкенд, можно в UI на экране Traffic — источник данных подхватится из `traffic.prometheusUrl`, а MCP-инструмент `query_prometheus` начнёт отвечать на PromQL-запросы.
 
