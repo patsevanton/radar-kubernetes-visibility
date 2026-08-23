@@ -341,8 +341,6 @@ Diff любых двух ресурсов одного вида side-by-side: st
 
 Сроки действия TLS-сертификатов по всем namespace'ам — поймать истекающий сертификат до того, как он уронит прод.
 
-![TLS Certificates — сроки действия сертификатов по namespace'ам](images/tls-certificates.png)
-
 Это карточка на Home-дашборде, а не пункт левого меню. В read-only сетапе этой статьи её не будет: карточка строится из TLS-типов Secret'ов (`kubernetes.io/tls`), а чтение Secrets в чарте выключено (`rbac.secrets: false`) — бэкенд гейтит агрегаты по per-user правам на Secrets и просто не отдаёт `certificateHealth` в ответе dashboard-эндпоинта. Появится карточка после `rbac.secrets: true` (вкладка Helm при этом оживёт тоже — см. раздел [Helm](#helm)).
 
 ### GitOps
