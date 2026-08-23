@@ -4,7 +4,7 @@
 
 У каждого, кто работает с Kubernetes, рано или поздно возникает потребность «посмотреть на кластер глазами»: кто с кем связан, почему под в CrashLoopBackOff, что изменилось за ночь, какие сертификаты истекают. Вариантов обычно два — Kubernetes Dashboard (слишком бедный) или Lens / Headlamp (десктопное приложение или тяжёлый стек с зависимостями). А kubectl-специалисты откапывают причины инцидентов в простынях YAML, где сигнал тонет в `managedFields` и `status.conditions`.
 
-[Radar](https://github.com/skyhook-io/radar) — open-source UI для Kubernetes от Skyhook (YC W23). Один бинарник на Go, без регистрации и аккаунта, бесплатный навсегда. Топология кластера, браузер ресурсов, timeline событий, менеджер Helm-релизов, GitOps для Argo CD и Flux, карта трафика, аудит безопасности, анализ impact'а перед апгрейдом K8s и даже встроенный MCP-сервер, чтобы ИИ-агенты могли смотреть кластер глазами Radar вместо сырого kubectl.
+[Radar](https://github.com/skyhook-io/radar) — open-source UI для Kubernetes от Skyhook (YC W23). Один бинарник на Go, без регистрации и аккаунта, бесплатный навсегда. Топология кластера, браузер ресурсов, timeline событий, менеджер Helm-релизов, GitOps для Flux, карта трафика, аудит безопасности, анализ impact'а перед апгрейдом K8s и даже встроенный MCP-сервер, чтобы ИИ-агенты могли смотреть кластер глазами Radar вместо сырого kubectl.
 
 В этой статье мы развернём Radar в Yandex Managed Kubernetes через Helm — с ingress-nginx и доменом из публичного IP — и разберём все основные экраны. Разворачиваемый инстанс — общий для команды разработчиков, поэтому конфигурация строго read-only: все write-права выключены, ИИ-агенты подключаются к read-only MCP.
 
@@ -18,7 +18,7 @@
 | Топология | ✅ (Resources + Traffic) | ❌ | Платно (Lens Charts/Paid) | ❌ | ❌ |
 | Timeline | ✅ (memory/sqlite) | ❌ | ❌ | ❌ | ❌ |
 | Helm diff | ✅ | ❌ | Частично | ❌ | ❌ |
-| GitOps | ✅ (Argo CD + Flux) | ❌ | Частично (расширения) | Частично (плагины) | ❌ |
+| GitOps | ✅ (Flux) | ❌ | Частично (расширения) | Частично (плагины) | ❌ |
 | Карта трафика | ✅ (Hubble/Istio/Beyla/Caretta) | ❌ | ❌ | ❌ | ❌ |
 | Аудит | ✅ (31 проверка) | ❌ | ❌ | ❌ | ❌ |
 | Upgrade impact | ✅ | ❌ | ❌ | ❌ | ❌ |
@@ -309,12 +309,12 @@ Diff любых двух ресурсов одного вида side-by-side: st
 
 ### GitOps
 
-Отдельный workspace для Argo CD и Flux.
+Отдельный workspace для Flux.
 
 - Fleet-вид + детальная страница по каждому приложению (Topology / Changes / Activity)
 - Field-level drift, события, детект застрявших drift-лупов, parsed operation-failures
 - Lifecycle-осознанность: `Terminating`-чипы, zombie-операции
-- При подключении к Argo CD API — Git-rendered desired-vs-live diff (`argocd.existingSecret` в values)
+- При подключении к API — Git-rendered desired-vs-live diff (`argocd.existingSecret` в values)
 
 Управляющие действия (sync, suspend, resume, reconcile, rollback) в read-only сетапе статьи недоступны: ClusterRole выдаёт на Argo/Flux-группы только `get/list/watch`, а контроллер с автоматической синхронизацией делает изменения за вас.
 
