@@ -268,7 +268,9 @@ helm upgrade --install radar skyhook/radar --version 1.11.0 \
 - История релиза, отслеживание failed upgrades и rollback-паттернов
 - Диагностика зависших hooks с подами, событиями и логами
 
-В read-only сетапе этой статьи Radar не может видеть сами Helm-релизы: чарт хранит их в Secrets, а `rbac.secrets: false` — релизы недоступны без opt-in. Upgrade, rollback и uninstall из UI требуют `rbac.helm: true` и в эту конфигурацию не входят.
+В read-only сетапе этой статьи вкладка Helm покажет «Access Restricted — Insufficient permissions to list Helm releases». Это ожидаемое поведение, а не сломанный RBAC. Причина: Helm хранит метаданные каждого релиза в Secret'ах типа `helm.sh/release.v1` в namespace релиза — поэтому даже «просто посмотреть список» — это операция чтения Secrets, а она в чарте выключена (`rbac.secrets: false`). Флаг `rbac.helm` здесь ни при чём: он отвечает только за write-операции (upgrade/rollback/uninstall) и в эту конфигурацию не входит.
+
+Если список релизов всё же нужен — включите `rbac.secrets: true` в `radar-values.yaml.tftpl` и выполните `terraform apply`: Radar получит список релизов, values, rendered-манифесты и diff ревизий — по-прежнему read-only. Цена: Radar увидит **все** Secrets кластера, включая чувствительные (например, пароль админа Grafana из `vmks-grafana`).
 
 ### Compare
 
@@ -405,6 +407,8 @@ Read-only каталог: `issues` («что сломано прямо сейч�
 | Чтение Secrets | `rbac.secrets: true` | ❌ выключен |
 | Helm write (upgrade/rollback/uninstall) | `rbac.helm: true` | ❌ выключен |
 | RBAC-объекты в браузере | `rbac.viewRBAC: true` | ❌ выключен |
+
+Чтение Secrets — не только про сами Secrets в браузере: без него не работает и список Helm-релизов (см. раздел [Helm](#helm)).
 
 Port forwarding здесь включён осознанно: это единственный способ in-cluster Radar читать поток Hubble Relay. Право даёт только `pods/portforward` — `create` на порт-форварды, без exec и логов.
 
