@@ -12,7 +12,10 @@ rbac:
   podExec: false    # терминал в подах — включайте осознанно
   secrets: false    # чтение Secrets — выключено по умолчанию
   helm: false       # Helm write-операции — выключено по умолчанию
-  portForward: true # port-forward к hubble-relay — источник данных Traffic-карты (Cilium)
+  portForward: true # port-forward к hubble-relay — источник данных Traffic-карты (Cilium);
+                    # право не деструктивно: даёт только pods/portforward create (туннель к порту пода),
+                    # без exec/логов/write; интерактивный port-forward в in-cluster режиме отключён в коде,
+                    # право используют лишь внутренние подсистемы (hubble-relay для Traffic-карты)
 
 timeline:
   storage: memory
