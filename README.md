@@ -314,6 +314,8 @@ Diff любых двух ресурсов одного вида side-by-side: st
 
 ![TLS Certificates — сроки действия сертификатов по namespace'ам](images/tls-certificates.png)
 
+Это карточка на Home-дашборде, а не пункт левого меню. В read-only сетапе этой статьи её не будет: карточка строится из TLS-типов Secret'ов (`kubernetes.io/tls`), а чтение Secrets в чарте выключено (`rbac.secrets: false`) — бэкенд гейтит агрегаты по per-user правам на Secrets и просто не отдаёт `certificateHealth` в ответе dashboard-эндпоинта. Появится карточка после `rbac.secrets: true` (вкладка Helm при этом оживёт тоже — см. раздел [Helm](#helm)).
+
 ### GitOps
 
 Отдельный workspace для GitOps.
@@ -425,18 +427,6 @@ Claude Desktop (`claude_desktop_config.json`):
 }
 ```
 
-Cursor (`~/.cursor/mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "radar": {
-      "url": "http://ваш-fqdn-url/mcp-readonly"
-    }
-  }
-}
-```
-
 Read-only каталог: `issues` («что сломано прямо сейчас?»), `diagnose` (root-cause одного workload'а в один вызов — с логами, событиями и startup-блокерами), `get_topology`, `get_neighborhood`, `list_helm_releases`, `get_cluster_audit`, `query_prometheus` и другие — всего ~25 read-инструментов.
 
 ## RBAC: что по умолчанию, а что opt-in
@@ -453,6 +443,10 @@ Read-only каталог: `issues` («что сломано прямо сейч�
 | RBAC-объекты в браузере | `rbac.viewRBAC: true` | ❌ выключен |
 
 Чтение Secrets — не только про сами Secrets в браузере: без него не работает и список Helm-релизов (см. раздел [Helm](#helm)).
+
+`rbac.viewRBAC: true` даёт только `get/list/watch` на Roles, RoleBindings, ClusterRoles, ClusterRoleBindings — все write-глаголы у Radar в RBAC-группах отсутствуют в принципе, так что через UI создать/изменить/удалить роль нельзя в любой конфигурации. Флаг чисто про видимость: Roles/Bindings появятся в браузере ресурсов, а на страницах Pod/Workload/ServiceAccount оживут секции Permissions (direct bindings, effective permissions, blast-radius). Отдельный вопрос — доверие: в no-auth сетапе (наш случай) чтение идёт из общего informer-кэша под ServiceAccount'ом Radar, без per-user проверки, то есть любой, кто открыл URL, видит весь граф авторизации кластера. В auth/cloud-режимах чтения перепроверяются под права конкретного пользователя, и там флаг включается автоматически.
+
+Насколько это опасно: сами RBAC-объекты секретов не содержат, но выдают атакующему **карту авторизации кластера** — разведка без единого подозрительного события. Видно, какие ServiceAccount'ы имеют wildcard-права, глаголы `escalate`/`bind`/`impersonate` или cluster-wide `create pods` (то есть кого компрометировать ради эскалации), и не висит ли мощная роль на широких группах `system:authenticated`/`system:unauthenticated` (это готовая эскалация — права уже есть у любого). В нашем публичном no-auth сетапе маржинальный риск умеренный: атакующий и так видит поды, их SA и логи. Настоящая защита — закрыть UI (auth.mode или IP/VPN-ограничение ingress), а не этот флаг; но при публичном UI держать `viewRBAC: false` разумно.
 
 Port forwarding здесь включён осознанно, и активирован он только для Hubble: это единственный способ in-cluster Radar читать поток Hubble Relay. Право даёт только `pods/portforward` — `create` на порт-форварды, без exec и логов. Port forwarding как пользовательская фича через UI не включён: сделать port-forward на произвольный под из браузера нельзя.
 

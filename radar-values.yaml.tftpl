@@ -16,6 +16,9 @@ rbac:
                     # право не деструктивно: даёт только pods/portforward create (туннель к порту пода),
                     # без exec/логов/write; интерактивный port-forward в in-cluster режиме отключён в коде,
                     # право используют лишь внутренние подсистемы (hubble-relay для Traffic-карты)
+  viewRBAC: true    # Roles/RoleBindings/ClusterRoles/ClusterRoleBindings в браузере ресурсов
+                    # + секции Permissions на Pod/Workload/ServiceAccount. Только get/list/watch —
+                    # write-глаголов в RBAC-группах у Radar нет в принципе. Оценку рисков см. в README (RBAC-таблица)
 
 timeline:
   storage: memory
