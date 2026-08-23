@@ -262,8 +262,6 @@ helm upgrade --install radar skyhook/radar --version 1.11.0 \
 - Группировка по субъекту: одно падающее приложение — не двадцать строк
 - Каузальные связи и корреляция с изменениями из Timeline: какая правка spec/config предшествовала critical-проблеме
 
-Issues ≠ [Checks](#checks): первое — «падает ли ресурс прямо сейчас», второе — статический best-practice posture. Полоса Issues ранжирует сбои и на Home-дашборде, а ИИ-агенты получают тот же поток через MCP-инструмент `issues` (см. [AI Integration (MCP)](#ai-integration-mcp)).
-
 ![Issues — ранжированный поток текущих проблем кластера](images/issues.png)
 
 ### Topology
