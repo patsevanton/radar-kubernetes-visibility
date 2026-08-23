@@ -171,3 +171,13 @@ output "radar_url" {
   description = "URL Radar за ingress-nginx (http, TLS не настроен)"
   value       = "http://${local.radar_fqdn}"
 }
+
+output "grafana_url" {
+  description = "URL Grafana (сформирован через sslip.io из публичного IP балансировщика ingress-nginx)"
+  value       = "http://grafana.${local.ingress_public_ip}.sslip.io"
+}
+
+output "grafana_admin_password_command" {
+  description = "Команда для получения пароля администратора Grafana из секрета vmks-grafana"
+  value       = "kubectl get secret vmks-grafana -n vmks -o jsonpath='{.data.admin-password}' | base64 --decode; echo"
+}
