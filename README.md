@@ -115,7 +115,7 @@ kubectl get secret vmks-grafana -n vmks -o jsonpath='{.data.admin-password}' | b
 
 ## Caretta: источник данных для Traffic-карты
 
-Traffic-карта рисует живые сетевые потоки между сервисами. Radar умеет собирать их из Hubble (Cilium), Istio или Caretta — но Hubble и Istio требуют замены CNI или service mesh, а [Caretta](https://github.com/groundcover-com/caretta) от groundcover ставится поверх любого кластера: eBPF-агент в виде DaemonSet'а без модификации кластера. Требования — Linux kernel ≥ 4.16 и CO-RE (любой современный дистрибутив подходит).
+Traffic-карта рисует живые сетевые потоки между сервисами. Radar умеет собирать их из Hubble (Cilium), Istio или Caretta — но Hubble и Istio требуют замены CNI или service mesh, а [Caretta](https://github.com/groundcover-com/caretta) от groundcover ставится поверх любого кластера: eBPF-агент в виде DaemonSet'а без модификации кластера. Требования — Linux kernel ≥ 4.16 и CO-RE (любой современный дистрибутив подходит). CO-RE (Compile Once – Run Everywhere) — технология eBPF, позволяющая один раз скомпилировать eBPF-программу и запускать её на любых ядрах за счёт BTF-информации о типах ядра, которая включена по умолчанию во всех современных дистрибутивах (Ubuntu 20.04+, RHEL 8+, Debian 11+ и т.д.).
 
 Caretta по умолчанию тащит за собой собственные VictoriaMetrics и Grafana. В этой статье бэкенд у нас уже есть (vmsingle из vmks), поэтому ставим Caretta лёгкой версией — только eBPF-агент — а его метрики vmagent начнёт скрейпить через VMPodScrape, добавленный в `vmks-values.yaml` на предыдущем шаге:
 
