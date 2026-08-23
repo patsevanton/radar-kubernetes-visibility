@@ -246,6 +246,8 @@ helm upgrade --install radar skyhook/radar --version 1.11.0 \
 
 Именно здесь быстрее всего понимаешь «кто кого использует» в незнакомом namespace.
 
+![Topology — интерактивный граф связей ресурсов кластера](images/topology.png)
+
 ### Resources
 
 Табличный браузер всех ресурсов кластера, включая CRD (Radar авто-детектит любые Custom Resources).
@@ -254,6 +256,8 @@ helm upgrade --install radar skyhook/radar --version 1.11.0 \
 - Поиск по имени, фильтр по статусу и проблемам (CrashLoopBackOff, ImagePullBackOff, …)
 - Кастомные колонки из любых лейблов и аннотаций
 - Клик по ресурсу: YAML, related resources, логи, события
+
+![Resources — табличный браузер всех ресурсов кластера](images/resources.png)
 
 ### Image Filesystem Viewer
 
@@ -265,6 +269,8 @@ helm upgrade --install radar skyhook/radar --version 1.11.0 \
 - Работает с приватными реестрами (GCR, ECR, ACR) через ImagePullSecrets кластера
 - Дисковый кэш слоёв для повторного доступа
 
+![Image Filesystem Viewer — дерево файлов container-образа](images/image-filesystem-viewer.png)
+
 ### Timeline
 
 Единая лента событий Kubernetes и изменений ресурсов.
@@ -272,6 +278,8 @@ helm upgrade --install radar skyhook/radar --version 1.11.0 \
 - Фильтр по типу (все / только warnings)
 - Diff'ы изменений: что именно поменялось (replicas, images, …)
 - Реальное время: новые события прилетают по SSE
+
+![Timeline — лента событий и diff'ов изменений ресурсов](images/timeline.png)
 
 ### Helm
 
@@ -281,6 +289,8 @@ helm upgrade --install radar skyhook/radar --version 1.11.0 \
 - Инспекция values, rendered-манифестов, diff ревизий
 - История релиза, отслеживание failed upgrades и rollback-паттернов
 - Диагностика зависших hooks с подами, событиями и логами
+
+![Helm — список релизов и история изменений](images/helm.png)
 
 В read-only сетапе этой статьи вкладка Helm покажет «Access Restricted — Insufficient permissions to list Helm releases». Это ожидаемое поведение, а не сломанный RBAC. Причина: Helm хранит метаданные каждого релиза в Secret'ах типа `helm.sh/release.v1` в namespace релиза — поэтому даже «просто посмотреть список» — это операция чтения Secrets, а она в чарте выключена (`rbac.secrets: false`). Флаг `rbac.helm` здесь ни при чём: он отвечает только за write-операции (upgrade/rollback/uninstall) и в эту конфигурацию не входит.
 
@@ -295,9 +305,13 @@ Diff любых двух ресурсов одного вида side-by-side: st
 - Spec-only — отбрасывает `status`
 - Шум (`managedFields`, `resourceVersion`) вычищается автоматически
 
+![Compare — diff двух ресурсов side-by-side](images/compare.png)
+
 ### TLS Certificates
 
 Сроки действия TLS-сертификатов по всем namespace'ам — поймать истекающий сертификат до того, как он уронит прод.
+
+![TLS Certificates — сроки действия сертификатов по namespace'ам](images/tls-certificates.png)
 
 ### GitOps
 
@@ -307,6 +321,8 @@ Diff любых двух ресурсов одного вида side-by-side: st
 - Field-level drift, события, детект застрявших drift-лупов, parsed operation-failures
 - Lifecycle-осознанность: `Terminating`-чипы, zombie-операции
 - При подключении к API — Git-rendered desired-vs-live diff (`argocd.existingSecret` в values)
+
+![GitOps — fleet-вид приложений Flux](images/gitops.png)
 
 Управляющие действия (sync, suspend, resume, reconcile, rollback) в read-only сетапе статьи недоступны: ClusterRole выдаёт на Argo/Flux-группы только `get/list/watch`, а контроллер с автоматической синхронизацией делает изменения за вас.
 
@@ -322,13 +338,19 @@ Diff любых двух ресурсов одного вида side-by-side: st
 
 В этом кластере источник — Hubble (раздел выше): Radar детектит hubble-relay в `kube-system` и читает поток сетевых событий через port-forward. Рёбра графа утолщаются с ростом throughput и тускнеют, когда трафик останавливается; hover по ребру — p50/p95/p99 latency и top status codes. Дропнутые потоки отображаются с причиной (например, `POLICY_DENIED`) и коррелируются с NetworkPolicy, которая их заблокировала.
 
+![Traffic — живая карта сетевого трафика между сервисами](images/traffic.png)
+
 ### Capacity (Karpenter)
 
 Read-only диагностика Karpenter-флитов: почему под pending, какой NodePool его примет, что делает disruption. Появляется автоматически при детекте NodePool'ов (RBAC-gated). Каждое значение несёт маркер достоверности (`= ≥ ≤ ?`) — недоступное никогда не отображается как ноль.
 
+![Capacity — диагностика Karpenter-флитов](images/capacity.png)
+
 ### Cost Insights
 
 Интеграция с OpenCost: почасовая и месячная стоимость кластера, top namespaces по расходам, тренды (6h/24h/7d), разрезы по workload'ам и нодам. Появляется автоматически при детекте OpenCost-метрик в Prometheus. В этом кластере OpenCost развёрнут разделом выше с тарифами Yandex Cloud — стоимость отображается в рублях.
+
+![Cost Insights — стоимость кластера в рублях по тарифам Yandex Cloud](images/cost-insights.png)
 
 ### Cluster Audit
 
@@ -340,6 +362,8 @@ Read-only диагностика Karpenter-флитов: почему под pen
 - Каждый finding — с описанием и remediation-гайдом
 - Фильтры по категории, severity, framework (NSA/CISA, CIS)
 
+![Cluster Audit — результаты сканирования best practices](images/cluster-audit.png)
+
 ### Network Path Diagnose
 
 Hop-by-hop диагностика для Service, Ingress, HTTPRoute, GRPCRoute и Gateway: «если трафик пойдёт в этот ресурс — долетит ли до healthy-процесса, и если нет, какой hop ломается первым?»
@@ -348,6 +372,8 @@ Hop-by-hop диагностика для Service, Ingress, HTTPRoute, GRPCRoute 
 - Опциональный one-shot reachability test: DNS / TCP / TLS / HTTP пробы (прямой TCP из in-cluster Radar, через API-server proxy — с ноутбука)
 - NetworkPolicies статически оцениваются на «would block»
 - Каждому finding'у прилагается kubectl-репродьюсер
+
+![Network Path Diagnose — hop-by-hop диагностика сетевого пути](images/network-path-diagnose.png)
 
 ### Kubernetes Upgrade Impact
 
@@ -359,6 +385,8 @@ Hop-by-hop диагностика для Service, Ingress, HTTPRoute, GRPCRoute 
 
 Для Yandex Managed K8s — прямая находка: перед апгрейдом мастер'а видно, что поедет.
 
+![Upgrade Impact — проверки кластера перед апгрейдом K8s](images/upgrade-impact.png)
+
 ### Access Control (RBAC visibility)
 
 Что реально может ServiceAccount — без трёх `kubectl describe`.
@@ -366,6 +394,8 @@ Hop-by-hop диагностика для Service, Ingress, HTTPRoute, GRPCRoute 
 - SA detail: прямые bindings, effective permissions, наследование через implicit groups, «какие поды это используют»
 - Pod detail: Permissions-секция + blast-radius alert, если у SA wildcards, cluster-admin или escalation-глаголы
 - «My Permissions»: live `SelfSubjectRulesReview` для текущего юзера
+
+![Access Control — effective permissions ServiceAccount](images/access-control.png)
 
 ### AI Integration (MCP)
 
@@ -375,6 +405,8 @@ Hop-by-hop диагностика для Service, Ingress, HTTPRoute, GRPCRoute 
 
 - Read-инструменты строго read-only (`readOnlyHint`)
 - Secret-данные структурно никогда не отдаются; env-значения и логи скрабятся
+
+![AI Integration — подключение ИИ-агентов через MCP](images/ai-integration.png)
 
 Подключение к Claude Code:
 
