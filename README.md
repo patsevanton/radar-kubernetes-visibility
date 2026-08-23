@@ -72,7 +72,7 @@ kubectl get secret vmks-grafana -n vmks -o jsonpath='{.data.admin-password}' | b
 
 ### Шаг 1. ConfigMap с ценами
 
-До установки чарта, иначе cost-model стартует с дефолтными ценами:
+До установки чарта, иначе будет ошибка:
 
 ```bash
 kubectl create namespace opencost --dry-run=client -o yaml | kubectl apply -f -
@@ -80,8 +80,6 @@ kubectl apply -f custom-pricing-configmap.yaml
 ```
 
 ### Шаг 2. Устанавливаем
-
-Values-файл `opencost-values.yaml` генерируется Terraform'ом из `opencost-values.yaml.tftpl` — выполните `terraform apply` или возьмите файл как есть:
 
 ```bash
 helm upgrade --install opencost oci://ghcr.io/opencost/charts/opencost \
@@ -93,6 +91,29 @@ helm upgrade --install opencost oci://ghcr.io/opencost/charts/opencost \
 ### Шаг 3. Скрейпинг метрик
 
 ```bash
+cat <<EOF > opencost-vmservicescrape.yaml
+# VMServiceScrape — нативный для vmagent способ скрейпить /metrics OpenCost (порт 9003).
+# ServiceMonitor из чарта OpenCost не работает: в этом кластере нет Prometheus Operator CRD,
+# а vmagent из vmks-стека скрейпит по VMServiceScrape (selectAllByDefault: true).
+# Метрики попадают в vmsingle → Radar Cost детектит node_total_hourly_cost и др.
+# Применить ПОСЛЕ установки чарта OpenCost (scrape выбирает Service чарта по лейблам).
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: opencost
+  namespace: opencost
+  labels:
+    app.kubernetes.io/name: opencost
+    app.kubernetes.io/instance: opencost
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opencost
+      app.kubernetes.io/instance: opencost
+  endpoints:
+    - port: http
+      path: /metrics
+EOF
 kubectl apply -f opencost-vmservicescrape.yaml
 ```
 
