@@ -436,7 +436,7 @@ Hop-by-hop диагностика для Service, Ingress, HTTPRoute, GRPCRoute 
 Подключение к Claude Code:
 
 ```bash
-claude mcp add radar --transport http http://ваш-fqdn-url/mcp-readonly
+claude mcp add radar --transport http http://ваш-fqdn-url/mcp
 ```
 
 Claude Desktop (`claude_desktop_config.json`):
@@ -446,7 +446,7 @@ Claude Desktop (`claude_desktop_config.json`):
   "mcpServers": {
     "radar": {
       "type": "http",
-      "url": "http://ваш-fqdn-url/mcp-readonly"
+      "url": "http://ваш-fqdn-url/mcp"
     }
   }
 }
