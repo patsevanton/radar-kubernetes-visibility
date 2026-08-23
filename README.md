@@ -433,12 +433,6 @@ Hop-by-hop диагностика для Service, Ingress, HTTPRoute, GRPCRoute 
 - Read-инструменты строго read-only (`readOnlyHint`)
 - Secret-данные структурно никогда не отдаются; env-значения и логи скрабятся
 
-Подключение к Claude Code:
-
-```bash
-claude mcp add radar --transport http http://ваш-fqdn-url/mcp
-```
-
 Claude Desktop (`claude_desktop_config.json`):
 
 ```json
@@ -446,15 +440,11 @@ Claude Desktop (`claude_desktop_config.json`):
   "mcpServers": {
     "radar": {
       "type": "http",
-      "url": "http://ваш-fqdn-url/mcp"
+      "url": "http://ваш-fqdn-url//mcp-readonly"
     }
   }
 }
 ```
-
-Read-only каталог: `issues` («что сломано прямо сейчас?»), `diagnose` (root-cause одного workload'а в один вызов — с логами, событиями и startup-блокерами), `get_topology`, `get_neighborhood`, `list_helm_releases`, `get_cluster_audit`, `query_prometheus` и другие — всего ~25 read-инструментов.
-
-Проверено на практике: даже при подключении к полному mount'у `/mcp` доступ только read-only — все write-операции упираются в RBAC (`forbidden`).
 
 ## RBAC: что по умолчанию, а что opt-in
 
