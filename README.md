@@ -406,8 +406,6 @@ Hop-by-hop диагностика для Service, Ingress, HTTPRoute, GRPCRoute 
 - Read-инструменты строго read-only (`readOnlyHint`)
 - Secret-данные структурно никогда не отдаются; env-значения и логи скрабятся
 
-![AI Integration — подключение ИИ-агентов через MCP](images/ai-integration.png)
-
 Подключение к Claude Code:
 
 ```bash
