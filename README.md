@@ -454,6 +454,8 @@ Claude Desktop (`claude_desktop_config.json`):
 
 Read-only каталог: `issues` («что сломано прямо сейчас?»), `diagnose` (root-cause одного workload'а в один вызов — с логами, событиями и startup-блокерами), `get_topology`, `get_neighborhood`, `list_helm_releases`, `get_cluster_audit`, `query_prometheus` и другие — всего ~25 read-инструментов.
 
+Проверено на практике: даже при подключении к полному mount'у `/mcp` доступ только read-only — все write-операции упираются в RBAC (`forbidden`).
+
 ## RBAC: что по умолчанию, а что opt-in
 
 Чарт создаёт ClusterRole с read-only доступом к стандартным ресурсам (Pods, Deployments, Services, Events, Nodes, …) и ~45 группам CRD (FluxCD, cert-manager, Istio, Karpenter, KEDA, Velero, Crossplane, Kyverno, CloudNativePG, …). Опасные права выключены:
