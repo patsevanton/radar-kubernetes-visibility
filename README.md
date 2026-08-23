@@ -363,7 +363,7 @@ Hop-by-hop диагностика для Service, Ingress, HTTPRoute, GRPCRoute 
 Подключение к Claude Code:
 
 ```bash
-claude mcp add radar --transport http http://radar.51-250-10-20.sslip.io/mcp-readonly
+claude mcp add radar --transport http http://ваш-fqdn-url/mcp-readonly
 ```
 
 Claude Desktop (`claude_desktop_config.json`):
@@ -373,7 +373,7 @@ Claude Desktop (`claude_desktop_config.json`):
   "mcpServers": {
     "radar": {
       "type": "http",
-      "url": "http://radar.51-250-10-20.sslip.io/mcp-readonly"
+      "url": "http://ваш-fqdn-url/mcp-readonly"
     }
   }
 }
@@ -385,7 +385,7 @@ Cursor (`~/.cursor/mcp.json`):
 {
   "mcpServers": {
     "radar": {
-      "url": "http://radar.51-250-10-20.sslip.io/mcp-readonly"
+      "url": "http://ваш-fqdn-url/mcp-readonly"
     }
   }
 }
