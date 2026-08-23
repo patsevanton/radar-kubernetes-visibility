@@ -1,0 +1,52 @@
+# OpenCost: расчёт стоимости кластера по тарифам Yandex Cloud (₽).
+# Цены задаёт ConfigMap custom-pricing-model (см. opencost.tf), поэтому здесь
+# createConfigmap: false — чарт генерирует ConfigMap в JSON-обёртке, которую
+# OpenCost не читает (https://github.com/opencost/opencost/issues/2925).
+
+opencost:
+  exporter:
+    # Кэш агрегатов стоимости (retention1d/1h) теряется при рестарте пода —
+    # сохраняем на PVC, чтобы Cost Insights в Radar не «забывал» историю.
+    persistence:
+      enabled: true
+      accessMode: ReadWriteOnce
+      size: 10Gi
+
+    extraEnv:
+      CLOUD_PROVIDER: DEFAULT          # тарифы задаёт custom-pricing-model, а не cloud-провайдер
+      KUBECOST_SCRAPE_INTERVAL: 5m     # интервал чтения метрик из VictoriaMetrics
+      USE_CUSTOM_PROVIDER: "true"      # использовать кастомные цены из ConfigMap
+      # Не дублировать kube_* метрики (их уже отдаёт kube-state-metrics из vmks-стека),
+      # иначе sum(kube_pod_*) в Grafana даёт 2x — https://github.com/opencost/opencost/issues/1465
+      EMIT_KSM_V1_METRICS: "false"
+      EMIT_KSM_V1_METRICS_ONLY: "true"
+
+  # Источник метрик — vmsingle из vmks-стека (node-exporter + kube-state-metrics)
+  prometheus:
+    internal:
+      serviceName: vmsingle-vmks-victoria-metrics-k8s-stack
+      namespaceName: vmks
+      port: 8428
+
+  customPricing:
+    enabled: true
+    createConfigmap: false
+    provider: custom
+
+  ui:
+    # Обход hairpin NAT в Yandex Cloud: nginx UI-контейнера проксирует API cost-model
+    # через localhost вместо ClusterIP (иначе ответ от своего же Service теряется)
+    modelFqdn: "localhost:9003"
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      annotations:
+        nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      hosts:
+        - host: ${opencost_fqdn}
+          paths:
+            - /
+
+  # UI OpenCost не нужен — стоимость смотрим в Radar (Cost Insights)
+  mcp:
+    enabled: false

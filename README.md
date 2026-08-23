@@ -111,7 +111,66 @@ kubectl get pods -n vmks
 kubectl get secret vmks-grafana -n vmks -o jsonpath='{.data.admin-password}' | base64 --decode; echo
 ```
 
-Проверить, что Radar увидел бэкенд, можно в UI — Cost Insights подхватится автоматически, а MCP-инструмент `query_prometheus` начнёт отвечать на PromQL-запросы.
+Проверить, что Radar увидел бэкенд, можно в UI — MCP-инструмент `query_prometheus` начнёт отвечать на PromQL-запросы. Для Cost Insights дополнительно нужен OpenCost — см. раздел ниже.
+
+## OpenCost: Cost Insights в рублях по тарифам Yandex Cloud
+
+Одного Prometheus-бэкенда для Cost Insights недостаточно: Radar показывает стоимость только при наличии cost-метрик OpenCost (`node_total_hourly_cost`, `container_cpu_allocation`, …) в бэкене. Без них вкладка Cost пишет «OpenCost metrics not found — Prometheus is available but no cost metrics were detected».
+
+OpenCost ставится чартом `opencost` (2.5.10) в namespace `opencost` и состоит из cost-model (считает стоимость) и UI. Источник метрик — vmsingle из vmks-стека, цены — тарифы Yandex Cloud в рублях.
+
+Из нестандартного в этой конфигурации:
+
+- **Custom pricing через ConfigMap** — чарт генерирует ConfigMap с ценами в JSON-обёртке, которую OpenCost игнорирует ([opencost#2925](https://github.com/opencost/opencost/issues/2925)). Поэтому ConfigMap `custom-pricing-model` с плоскими ключами (`CPU: 841.617` = 1.1529 ₽/vCPU-час × 730) применяется из `custom-pricing-configmap.yaml` до установки чарта, а в values — `createConfigmap: false`
+- **VMServiceScrape вместо ServiceMonitor** — чарт умеет создавать ServiceMonitor, но он работает только с Prometheus Operator CRD, которых в этом кластере нет. vmagent из vmks-стека скрейпит по нативным VMServiceScrape (`selectAllByDefault: true`), поэтому скрейп-конфиг для /metrics OpenCost (порт 9003) применяется из `opencost-vmservicescrape.yaml` после установки чарта
+- **PVC для кэша агрегатов** — без persistence внутренний кэш OpenCost (retention: 15 дней дневного / 49 часов часового разрешения) теряется при рестарте пода
+- **`modelFqdn: localhost:9003`** — обход hairpin NAT в Yandex Cloud: nginx UI-контейнера проксирует API cost-model через localhost вместо ClusterIP
+- **`EMIT_KSM_V1_METRICS: "false"` + `EMIT_KSM_V1_METRICS_ONLY: "true"`** — OpenCost не дублирует kube_* метрики, которые уже отдаёт kube-state-metrics из vmks-стека ([opencost#1465](https://github.com/opencost/opencost/issues/1465))
+
+Тарифы в `custom-pricing-configmap.yaml`: CPU 1.1529 ₽/vCPU-час, RAM 0.3074 ₽/ГБ-час, network-ssd диск, egress 1.68 ₽/GiB, NLB 0.8564 ₽/час. Значения для CPU/RAM/storage указываются как месячная ставка (₽ × 730), egress и LB — как есть. Обновить под свой набор SKU можно скриптом [fetch_yandex_sku_prices.py](https://github.com/patsevanton/opencost-yandex-cloud/blob/main/scripts/fetch_yandex_sku_prices.py) из проекта opencost-yandex-cloud.
+
+### Шаг 1. ConfigMap с ценами
+
+Создаём namespace и ConfigMap с тарифами до установки чарта — иначе cost-model стартует с дефолтными ценами:
+
+```bash
+kubectl create namespace opencost --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f custom-pricing-configmap.yaml
+```
+
+### Шаг 2. Устанавливаем
+
+Values-файл `opencost-values.yaml` генерируется Terraform'ом из `opencost-values.yaml.tftpl` (FQDN из публичного IP ingress) — выполните `terraform apply` или возьмите файл как есть:
+
+```bash
+helm upgrade --install opencost oci://ghcr.io/opencost/charts/opencost \
+  --namespace opencost \
+  --version 2.5.10 \
+  --wait --values opencost-values.yaml
+```
+
+### Шаг 3. Скрейпинг метрик
+
+```bash
+kubectl apply -f opencost-vmservicescrape.yaml
+```
+
+### Шаг 4. Проверяем
+
+```bash
+# Под OpenCost (2 контейнера: cost-model + UI)
+kubectl get pods -n opencost
+
+# Цены применились (должно быть 1.1529 — тариф Yandex Cloud за vCPU-час)
+kubectl exec -n opencost deploy/opencost -c opencost -- \
+  wget -qO- http://localhost:9003/metrics | grep node_cpu_hourly_cost
+
+# Метрики дошли до vmsingle (Radar Cost Insights берёт их отсюда)
+kubectl exec -n vmks deploy/vmsingle-vmks-victoria-metrics-k8s-stack -- \
+  wget -qO- 'http://localhost:8428/api/v1/query?query=node_total_hourly_cost'
+```
+
+Через ~10 минут после установки (OpenCost собирает метрики с интервалом 5 минут) вкладка **Cost** в Radar заполнится: почасовая и месячная стоимость кластера в рублях, top namespaces по расходам, разрезы по workload'ам и нодам. OpenCost UI дополнительно доступен по output `opencost_fqdn`.
 
 ## Hubble (Cilium): источник данных для Traffic-карты
 
@@ -314,7 +373,7 @@ Read-only диагностика Karpenter-флитов: почему под pen
 
 ### Cost Insights
 
-Интеграция с OpenCost: почасовая и месячная стоимость кластера, top namespaces по расходам, тренды (6h/24h/7d), разрезы по workload'ам и нодам. Появляется автоматически при детекте OpenCost-метрик в Prometheus.
+Интеграция с OpenCost: почасовая и месячная стоимость кластера, top namespaces по расходам, тренды (6h/24h/7d), разрезы по workload'ам и нодам. Появляется автоматически при детекте OpenCost-метрик в Prometheus. В этом кластере OpenCost развёрнут разделом выше с тарифами Yandex Cloud — стоимость отображается в рублях.
 
 ### Cluster Audit
 
@@ -433,7 +492,7 @@ persistence:
 
 ## Подключение Prometheus (Cost Insights)
 
-Для Cost Insights нужен Prometheus или VictoriaMetrics. Если автодетект не находит инстанс, укажите URL явно — в этой статье бэкенд ставится разделом выше (vmsingle в namespace `vmks`). Traffic-карта этот URL не использует: её источник — Hubble:
+Для Cost Insights нужны два компонента: PromQL-совместимый бэкенд (Prometheus, VictoriaMetrics, Thanos, Mimir) и OpenCost, чьи cost-метрики скрейпятся в этот бэкенд. Оба ставятся в этой статье автоматически: vmsingle из vmks-стека + OpenCost с VMServiceScrape (раздел [OpenCost](#opencost-cost-insights-в-рублях-по-тарифам-yandex-cloud)). Если автодетект не находит бэкенд, укажите URL явно:
 
 ```yaml
 traffic:

@@ -1,0 +1,31 @@
+# ConfigMap с тарифами Yandex Cloud для OpenCost.
+# Чарт OpenCost генерирует ConfigMap с ценами в JSON-обёртке, которую OpenCost
+# игнорирует (https://github.com/opencost/opencost/issues/2925), поэтому создаём
+# свой с плоскими ключами и подключаем через opencost.customPricing.createConfigmap: false.
+# Применить ДО установки чарта OpenCost, иначе cost-model стартует с дефолтными ценами.
+# Ключи должны совпадать с полями Go-структуры CustomPricing (с маленькой первой буквой),
+# иначе OpenCost их проигнорирует. Для CPU, RAM, storage OpenCost делит значение на 730.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-pricing-model
+  namespace: opencost
+data:
+  provider: "custom"
+  currencyCode: "RUB"
+  description: "Yandex Cloud тарифы (₽)"
+  # Месячные ставки (₽/мес за единицу) — OpenCost делит на 730 → почасовая ставка.
+  # CPU: 1.1529 ₽/vCPU-час (100% vCPU) × 730; RAM: 0.3074 ₽/ГБ-час × 730.
+  CPU: "841.617"
+  RAM: "224.402"
+  # 0.004453 ₽/ГБ-час (Стандартный диск HDD) × 730. Ноды используют network-ssd —
+  # при желании подставьте ставку SSD (см. scripts/fetch_yandex_sku_prices.py в opencost-yandex-cloud).
+  storage: "3.251"
+  # Сеть: стоимость за 1 GiB egress (₽/GiB). OpenCost НЕ делит на 730.
+  zoneNetworkEgress: "0"
+  regionNetworkEgress: "0"
+  internetNetworkEgress: "1.68" # ₽/GiB (исходящий трафик, стандартный тариф 10 ГБ – 1 ТБ)
+  # Load Balancer: ₽/час и ₽/GiB; ключ "loadBalancer" не работает — нет такого поля в OpenCost.
+  firstFiveForwardingRulesCost: "0.8564" # базовая ставка NLB
+  additionalForwardingRuleCost: "0"
+  LBIngressDataCost: "0.0659" # входящий трафик NLB

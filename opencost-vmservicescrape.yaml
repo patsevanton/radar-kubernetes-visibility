@@ -1,0 +1,21 @@
+# VMServiceScrape — нативный для vmagent способ скрейпить /metrics OpenCost (порт 9003).
+# ServiceMonitor из чарта OpenCost не работает: в этом кластере нет Prometheus Operator CRD,
+# а vmagent из vmks-стека скрейпит по VMServiceScrape (selectAllByDefault: true).
+# Метрики попадают в vmsingle → Radar Cost детектит node_total_hourly_cost и др.
+# Применить ПОСЛЕ установки чарта OpenCost (scrape выбирает Service чарта по лейблам).
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: opencost
+  namespace: opencost
+  labels:
+    app.kubernetes.io/name: opencost
+    app.kubernetes.io/instance: opencost
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opencost
+      app.kubernetes.io/instance: opencost
+  endpoints:
+    - port: http
+      path: /metrics
