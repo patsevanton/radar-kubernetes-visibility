@@ -316,7 +316,7 @@ Diff любых двух ресурсов одного вида side-by-side: st
 
 ### GitOps
 
-Отдельный workspace для [FluxCD](https://github.com/fluxcd/flux2).
+Отдельный workspace для GitOps.
 
 - Fleet-вид + детальная страница по каждому приложению (Topology / Changes / Activity)
 - Field-level drift, события, детект застрявших drift-лупов, parsed operation-failures
@@ -350,7 +350,7 @@ Read-only диагностика [Karpenter](https://github.com/kubernetes-sigs/
 
 ![Cost Insights — стоимость кластера в рублях по тарифам Yandex Cloud](images/cost-insights.png)
 
-### Cluster Audit
+### Checks
 
 Проактивный сканер best practices — 31 проверка по безопасности, надёжности и эффективности (вдохновлён [Polaris](https://github.com/FairwindsOps/polaris), [Kubescape](https://github.com/kubescape/kubescape), [Trivy](https://github.com/aquasecurity/trivy) и NSA/CISA guidelines).
 
@@ -360,7 +360,7 @@ Read-only диагностика [Karpenter](https://github.com/kubernetes-sigs/
 - Каждый finding — с описанием и remediation-гайдом
 - Фильтры по категории, severity, framework (NSA/CISA, CIS)
 
-![Cluster Audit — результаты сканирования best practices](images/cluster-audit.png)
+![Checks — результаты сканирования best practices](images/checks.png)
 
 ### Network Path Diagnose
 
