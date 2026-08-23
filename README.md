@@ -127,9 +127,11 @@ kubectl get pods -n opencost
 kubectl exec -n opencost deploy/opencost -c opencost -- \
   wget -qO- http://localhost:9003/metrics | grep node_cpu_hourly_cost
 
-# Метрики дошли до vmsingle (Radar Cost Insights берёт их отсюда)
+# Метрики дошли до vmsingle (Radar Cost Insights берёт их отсюда).
+# 127.0.0.1 вместо localhost: busybox-wget в контейнере vmsingle резолвит localhost в IPv6 (::1),
+# а victoria-metrics слушает только на IPv4 0.0.0.0:8428 — с localhost будет Connection refused.
 kubectl exec -n vmks deploy/vmsingle-vmks-victoria-metrics-k8s-stack -- \
-  wget -qO- 'http://localhost:8428/api/v1/query?query=node_total_hourly_cost'
+  wget -qO- 'http://127.0.0.1:8428/api/v1/query?query=node_total_hourly_cost'
 ```
 
 Через ~10 минут вкладка **Cost** в Radar заполнится. OpenCost UI доступен по output `opencost_fqdn`.
