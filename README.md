@@ -251,6 +251,21 @@ helm upgrade --install radar skyhook/radar --version 1.11.0 \
 
 ![Resources — табличный браузер всех ресурсов кластера](images/resources.png)
 
+### Issues
+
+Ранжированный поток «что сломано прямо сейчас» — падающие workload'ы, битые ссылки и застрявшие поды, сведённые в один список с severity **critical**/**warning** для триажа по влиянию.
+
+- **problem** — CrashLoopBackOff, OOMKill, ImagePullBackOff, провалы probes, недокатанные rollout'ы (`0/N replicas`, `ProgressDeadlineExceeded`), Jobs за backoff limit, зависшие Terminating с именами finalizer'ов, failed Helm-релизы
+- **scheduling** — точная причина, почему под не доезжает до Running: unschedulable (какая taint / affinity / topology-spread не удовлетворена), отказ admission (ResourceQuota, LimitRange, Pod Security, webhook), застревание после bind
+- **missing_ref** — битые ссылки: Pod → несуществующий ConfigMap/Secret/ServiceAccount, Ingress → отсутствующий backend-Service, HPA и KEDA ScaledObject → удалённый `scaleTargetRef`, PVC → несуществующий StorageClass
+- **condition** — False-условия операторных CRD: Argo CD / Flux (Degraded, failed sync, drift), cert-manager, KEDA, Knative, Crossplane, Gateway API
+- Группировка по субъекту: одно падающее приложение — не двадцать строк
+- Каузальные связи и корреляция с изменениями из Timeline: какая правка spec/config предшествовала critical-проблеме
+
+Issues ≠ [Checks](#checks): первое — «падает ли ресурс прямо сейчас», второе — статический best-practice posture. Полоса Issues ранжирует сбои и на Home-дашборде, а ИИ-агенты получают тот же поток через MCP-инструмент `issues` (см. [AI Integration (MCP)](#ai-integration-mcp)).
+
+![Issues — ранжированный поток текущих проблем кластера](images/issues.png)
+
 ### Topology
 
 Интерактивный граф связей ресурсов в реальном времени — визитная карточка Radar.
@@ -263,6 +278,20 @@ helm upgrade --install radar skyhook/radar --version 1.11.0 \
 Именно здесь быстрее всего понимаешь «кто кого использует» в незнакомом namespace.
 
 ![Topology — интерактивный граф связей ресурсов кластера](images/topology.png)
+
+### Applications
+
+Кластер, сгруппированный по приложениям, а не по сырым типам: «биллинг» — это один Deployment, worker, CronJob и Service, возможно в разных namespace, и экран **Applications** собирает их в одну строку.
+
+- Группировка из реальных свидетельств — фильтр **Source**: Argo CD / Flux, Helm-релиз, app-лейблы (`app.kubernetes.io/name`, `…/instance`, `…/part-of`), Ungrouped
+- Эвристика ошибается — декларируйте явно: аннотация `app.skyhook.io/app: billing` на всех workload'ах приложения
+- Чип на строке: declared-группировка (аннотация или GitOps-путь) или heuristic
+- Внутри приложения — workload-rail вокруг привычных вкладок: **Overview, Topology, Timeline, Logs, Metrics, YAML**
+- Топология скоуплена приложением — связи его workload'ов без шума остального кластера
+
+Работает в read-only сетапе статьи из коробки — достаточно read-прав, уже выданных чартом. Fleet-версия (одно приложение одной строкой поперёк кластеров) — функциональность Radar Cloud, в OSS-инстансе её нет.
+
+![Applications — кластер, сгруппированный по приложениям](images/applications.png)
 
 ### Image Filesystem Viewer
 
