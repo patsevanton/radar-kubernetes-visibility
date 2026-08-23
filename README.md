@@ -68,9 +68,7 @@ kubectl get secret vmks-grafana -n vmks -o jsonpath='{.data.admin-password}' | b
 
 ## OpenCost: Cost Insights в рублях по тарифам Yandex Cloud
 
-Cost Insights требует cost-метрики OpenCost (`node_total_hourly_cost`, `container_cpu_allocation`, …) в Prometheus-бэкенде — без них вкладка Cost пуста. OpenCost ставится чартом `opencost` (2.5.29) в namespace `opencost`, считает стоимость по тарифам Yandex Cloud в рублях (в `custom-pricing-configmap.yaml` CPU/RAM/storage — месячная ставка ₽ × 730, egress и LB — как есть) и скрейпится vmagent'ом в vmsingle.
-
-Из нестандартного: ConfigMap с ценами применяется до установки чарта — JSON-обёртка из чарта игнорируется ([opencost#2925](https://github.com/opencost/opencost/issues/2925)); скрейпинг через VMServiceScrape, а не ServiceMonitor (нет Prometheus Operator CRD); `modelFqdn: localhost:9003` — обход hairpin NAT в Yandex Cloud; `EMIT_KSM_V1_METRICS` — не дублировать kube_* метрики kube-state-metrics ([opencost#1465](https://github.com/opencost/opencost/issues/1465)). Подробнее про OpenCost — [статья на Habr](https://habr.com/ru/articles/1009678/).
+ Подробнее про OpenCost — [статья на Habr](https://habr.com/ru/articles/1009678/).
 
 ### Шаг 1. ConfigMap с ценами
 
