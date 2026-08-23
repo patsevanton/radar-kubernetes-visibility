@@ -134,11 +134,11 @@ kubectl exec -n vmks deploy/vmsingle-vmks-victoria-metrics-k8s-stack -- \
   wget -qO- 'http://127.0.0.1:8428/api/v1/query?query=node_total_hourly_cost'
 ```
 
-Через ~10 минут вкладка **Cost** в Radar заполнится. OpenCost UI доступен по output `opencost_fqdn`.
+Через ~10 минут вкладка **Cost** в Radar заполнится.
 
 ## Hubble (Cilium): источник данных для Traffic-карты
 
-Traffic-карта рисует живые сетевые потоки между сервисами. Radar умеет собирать их из Hubble (Cilium), Istio, Caretta или Grafana Beyla — но Istio требует service mesh, а Caretta/Beyla — отдельной установки поверх кластера. В этом кластере используется Hubble: кластер создаётся в туннельном режиме Cilium (`network_implementation { cilium {} }` в Terraform), и Yandex Managed K8s сам ставит Cilium и Hubble Relay в `kube-system` — ничего дополнительно устанавливать не нужно.
+Traffic-карта рисует живые сетевые потоки между сервисами. Radar умеет собирать их из Hubble (Cilium), Istio, Caretta или Grafana Beyla. В этом кластере используется Hubble: кластер создаётся в туннельном режиме Cilium (`network_implementation { cilium {} }` в Terraform), и Yandex Managed K8s сам ставит Cilium и Hubble Relay в `kube-system` — ничего дополнительно устанавливать не нужно.
 
 Туннельный режим Cilium (VxLAN):
 
