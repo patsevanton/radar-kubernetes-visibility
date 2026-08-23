@@ -6,7 +6,7 @@
 
 [Radar](https://github.com/skyhook-io/radar) — open-source UI для Kubernetes от Skyhook (YC W23). Один бинарник на Go, без регистрации и аккаунта, бесплатный навсегда. Топология кластера, браузер ресурсов, timeline событий, менеджер Helm-релизов, GitOps для Argo CD и Flux, карта трафика, аудит безопасности, анализ impact'а перед апгрейдом K8s и даже встроенный MCP-сервер, чтобы ИИ-агенты могли смотреть кластер глазами Radar вместо сырого kubectl.
 
-В этой статье мы запустим Radar локально за 30 секунд, затем развернём его в Yandex Managed Kubernetes через Helm — с ingress-nginx и доменом из публичного IP — и разберём все основные экраны. Разворачиваемый инстанс — общий для команды разработчиков, поэтому конфигурация строго read-only: все write-права выключены, ИИ-агенты подключаются к read-only MCP.
+В этой статье мы развернём Radar в Yandex Managed Kubernetes через Helm — с ingress-nginx и доменом из публичного IP — и разберём все основные экраны. Разворачиваемый инстанс — общий для команды разработчиков, поэтому конфигурация строго read-only: все write-права выключены, ИИ-агенты подключаются к read-only MCP.
 
 ## Radar vs Kubernetes Dashboard vs Lens vs Headlamp vs k9s
 
@@ -40,53 +40,6 @@ Radar не заменит Grafana с дашбордами метрик и не �
 - **Timeline** — единая лента событий и diff'ов изменений по ресурсам
 
 > Предполагается, что у вас уже есть работающий кластер Yandex Managed Kubernetes с установленным ingress-nginx. Как его поставить — описано в любом базовом гайде по Yandex K8s; статья начинается с работающего кластера.
-
-## Часть 1. Локальный запуск за 30 секунд
-
-Самый частый сценарий Radar — запуск с ноутбука: бинарник читает `~/.kube/config` и ходит в Kubernetes API напрямую. Ничего в кластер не ставится.
-
-```bash
-curl -fsSL https://get.radarhq.io | sh && kubectl radar
-```
-
-Откроется браузер с UI. Radar работает с тем же kubeconfig, что и kubectl: текущий контекст, все кластеры, multi-context переключение на лету.
-
-Другие способы установки:
-
-```bash
-# Homebrew (macOS/Linux)
-brew install skyhook-io/tap/radar
-
-# Krew (kubectl-плагин)
-kubectl krew install radar
-
-# Scoop (Windows)
-scoop bucket add skyhook https://github.com/skyhook-io/scoop-bucket
-scoop install radar
-
-# PowerShell (Windows)
-irm https://get.radarhq.io/install.ps1 | iex
-```
-
-Есть и нативное десктоп-приложение для macOS/Linux/Windows — без терминала:
-
-```bash
-brew install --cask skyhook-io/tap/radar-desktop
-```
-
-### Полезные флаги локального запуска
-
-| Флаг | По умолчанию | Описание |
-|------|--------------|----------|
-| `--namespace` | (все) | Начальный фильтр namespace'ов |
-| `--port` | `9280` | Порт сервера |
-| `--listen-address` | `127.0.0.1` | Только локальный доступ (по умолчанию) |
-| `--timeline-storage` | `memory` | Хранилище timeline: `memory` или `sqlite` |
-| `--disable-exec` | `false` | Выключить терминал и debug shell |
-| `--disable-helm-write` | `false` | Выключить Helm-операции записи |
-| `--no-mcp` | `false` | Выключить MCP-сервер для ИИ-агентов |
-
-Локальный режим — приватный по дизайну: данные кластера остаются на вашей машине, никуда не выгружаются, аккаунт не нужен.
 
 ## VictoriaMetrics до Radar: зачем и как
 
@@ -184,7 +137,7 @@ kubectl get pods -n kube-system | grep -E 'cilium|hubble'
 
 Откройте в Radar экран **Traffic**: Hubble детектится автоматически, и карта заполнится живыми рёбрами — кто с кем реально говорит прямо сейчас. Дополнительно Hubble даёт то, чего нет у метрических источников: dropped flows с указанием NetworkPolicy, которая заблокировала трафик, отображаются прямо на карте и коррелируются с политиками в Topology.
 
-## Часть 2. In-cluster деплой в Yandex Managed K8s
+## Часть 1. In-cluster деплой в Yandex Managed K8s
 
 Локальный режим удобен одному человеку. Для командной работы Radar разворачивается в кластер: один под, ClusterIP-сервис, ingress — и весь отдел видит кластер в браузере.
 
