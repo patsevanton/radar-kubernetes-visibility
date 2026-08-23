@@ -11,12 +11,20 @@ resource "yandex_resourcemanager_folder_iam_member" "sa_k8s_editor_permissions" 
   member    = "serviceAccount:${yandex_iam_service_account.sa_k8s_editor.id}" # Назначаемый участник
 }
 
+# Роль для туннельного режима Cilium (обязательна сервисному аккаунту кластера при network_implementation.cilium)
+resource "yandex_resourcemanager_folder_iam_member" "sa_k8s_tunnel_clusters_agent" {
+  folder_id = local.folder_id
+  role      = "k8s.tunnelClusters.agent"
+  member    = "serviceAccount:${yandex_iam_service_account.sa_k8s_editor.id}"
+}
+
 # Пауза, чтобы изменения IAM успели примениться до создания кластера
 resource "time_sleep" "wait_sa" {
   create_duration = "20s"
   depends_on = [
     yandex_iam_service_account.sa_k8s_editor,
-    yandex_resourcemanager_folder_iam_member.sa_k8s_editor_permissions
+    yandex_resourcemanager_folder_iam_member.sa_k8s_editor_permissions,
+    yandex_resourcemanager_folder_iam_member.sa_k8s_tunnel_clusters_agent,
   ]
 }
 
@@ -48,6 +56,14 @@ resource "yandex_kubernetes_cluster" "radar" {
     }
 
     public_ip = true # Включение публичного IP для доступа к мастеру
+  }
+
+  # Туннельный режим Cilium (VxLAN): eBPF-CNI, сетевые политики L3/L4/L7 и Hubble.
+  # Yandex Managed K8s при этом сам ставит Cilium и Hubble Relay (kube-system) —
+  # Radar детектит hubble-relay автоматически и читает потоки для Traffic-карты.
+  # Меняется только при создании кластера (ForceNew).
+  network_implementation {
+    cilium {}
   }
 
   # Сервисный аккаунт для управления кластером и нодами

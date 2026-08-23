@@ -50,26 +50,3 @@ vmalert:
   enabled: false
 alertmanager:
   enabled: false
-
-# Скрейп Caretta (eBPF-агент groundcover, источник данных для Traffic-карты Radar).
-# Ставится в namespace caretta с victoria-metrics-single.enabled=false и grafana.enabled=false,
-# поэтому собираем его метрики (caretta_links_observed) в общий vmsingle.
-# vmagent с selectAllByDefault: true подхватит VMPodScrape из любого namespace.
-extraObjects:
-  - apiVersion: operator.victoriametrics.com/v1beta1
-    kind: VMPodScrape
-    metadata:
-      name: caretta
-      namespace: vmks
-      labels:
-        managed-by: vmks-victoria-metrics-k8s-stack
-    spec:
-      selector:
-        matchLabels:
-          app.kubernetes.io/name: caretta
-      namespaceSelector:
-        matchNames:
-          - caretta
-      podMetricsEndpoints:
-        - port: prom-metrics
-          interval: 15s

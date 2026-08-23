@@ -8,18 +8,18 @@ ingress:
           pathType: Prefix
 
 rbac:
-  podLogs: true    # просмотр логов подов (включён по умолчанию)
-  podExec: false   # терминал в подах — включайте осознанно
-  secrets: false   # чтение Secrets — выключено по умолчанию
-  helm: false      # Helm write-операции — выключено по умолчанию
+  podLogs: true     # просмотр логов подов (включён по умолчанию)
+  podExec: false    # терминал в подах — включайте осознанно
+  secrets: false    # чтение Secrets — выключено по умолчанию
+  helm: false       # Helm write-операции — выключено по умолчанию
+  portForward: true # port-forward к hubble-relay — источник данных Traffic-карты (Cilium)
 
 timeline:
   storage: memory
 
-# Prometheus-бэкенд для Traffic-карты, Cost Insights и query_prometheus.
-# vmsingle из victoria-metrics-k8s-stack (см. раздел про vmks в README).
-traffic:
-  prometheusUrl: http://vmsingle-vmks-victoria-metrics-k8s-stack.vmks.svc:8429
+# Источник данных Traffic-карты — Hubble Relay (Cilium, туннельный режим кластера):
+# Radar детектит поды с лейблом k8s-app=hubble-relay и подключается через port-forward,
+# Prometheus-бэкенд не используется.
 
 resources:
   limits:

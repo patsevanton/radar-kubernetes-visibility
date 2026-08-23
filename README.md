@@ -90,7 +90,7 @@ brew install --cask skyhook-io/tap/radar-desktop
 
 ## VictoriaMetrics до Radar: зачем и как
 
-Функции Traffic-карты, Cost Insights и MCP-инструмент `query_prometheus` требуют PromQL-совместимый бэкенд (Prometheus, VictoriaMetrics, Thanos, Mimir). Cтавим минимальный стек `victoria-metrics-k8s-stack` (vmagent + vmsingle + Grafana) и указываем этот стек в `traffic.prometheusUrl`.
+Функции Cost Insights и MCP-инструмент `query_prometheus` требуют PromQL-совместимый бэкенд (Prometheus, VictoriaMetrics, Thanos, Mimir). Cтавим минимальный стек `victoria-metrics-k8s-stack` (vmagent + vmsingle + Grafana). Traffic-карта в этой статье работает через Hubble и Prometheus-бэкенд не использует.
 
 ### Шаг 2. Устанавливаем
 
@@ -111,35 +111,29 @@ kubectl get pods -n vmks
 kubectl get secret vmks-grafana -n vmks -o jsonpath='{.data.admin-password}' | base64 --decode; echo
 ```
 
-Проверить, что Radar увидел бэкенд, можно в UI на экране Traffic — источник данных подхватится из `traffic.prometheusUrl`, а MCP-инструмент `query_prometheus` начнёт отвечать на PromQL-запросы.
+Проверить, что Radar увидел бэкенд, можно в UI — Cost Insights подхватится автоматически, а MCP-инструмент `query_prometheus` начнёт отвечать на PromQL-запросы.
 
-## Caretta: источник данных для Traffic-карты
+## Hubble (Cilium): источник данных для Traffic-карты
 
-Traffic-карта рисует живые сетевые потоки между сервисами. Radar умеет собирать их из Hubble (Cilium), Istio или Caretta — но Hubble и Istio требуют замены CNI или service mesh, а [Caretta](https://github.com/groundcover-com/caretta) от groundcover ставится поверх любого кластера: eBPF-агент в виде DaemonSet'а без модификации кластера. Требования — Linux kernel ≥ 4.16 и CO-RE (любой современный дистрибутив подходит). CO-RE (Compile Once – Run Everywhere) — технология eBPF, позволяющая один раз скомпилировать eBPF-программу и запускать её на любых ядрах за счёт BTF-информации о типах ядра, которая включена по умолчанию во всех современных дистрибутивах (Ubuntu 20.04+, RHEL 8+, Debian 11+ и т.д.).
+Traffic-карта рисует живые сетевые потоки между сервисами. Radar умеет собирать их из Hubble (Cilium), Istio, Caretta или Grafana Beyla — но Istio требует service mesh, а Caretta/Beyla — отдельной установки поверх кластера. В этом кластере используется Hubble: кластер создаётся в туннельном режиме Cilium (`network_implementation { cilium {} }` в Terraform), и Yandex Managed K8s сам ставит Cilium и Hubble Relay в `kube-system` — ничего дополнительно устанавливать не нужно.
 
-Caretta по умолчанию тащит за собой собственные VictoriaMetrics и Grafana. В этой статье бэкенд у нас уже есть (vmsingle из vmks), поэтому ставим Caretta лёгкой версией — только eBPF-агент — а его метрики vmagent начнёт скрейпить через VMPodScrape, добавленный в `vmks-values.yaml` на предыдущем шаге:
+Туннельный режим Cilium (VxLAN):
+
+- eBPF вместо iptables: сетевые политики L3/L4/L7, фильтрация по DNS-имени
+- Hubble из коробки: наблюдаемость сетевых событий (dropped flows, correlation с NetworkPolicies)
+- Для сервисного аккаунта кластера обязательна роль `k8s.tunnelClusters.agent` (уже в Terraform-коде)
+- Включается только при создании кластера; перевести существующий кластер на Cilium нельзя
+
+Для подключения Radar к hubble-relay в `helm-values.yaml` включён `rbac.portForward: true`: Radar детектит поды с лейблом `k8s-app=hubble-relay` и читает поток событий через port-forward. Prometheus-бэкенд для Traffic-карты при этом не используется.
+
+Проверяем после создания кластера:
 
 ```bash
-helm repo add groundcover https://helm.groundcover.com/
-helm repo update
-helm install caretta --namespace caretta --create-namespace groundcover/caretta \
-  --set victoria-metrics-single.enabled=false \
-  --set grafana.enabled=false
+# Cilium и Hubble Relay работают (в kube-system)
+kubectl get pods -n kube-system | grep -E 'cilium|hubble'
 ```
 
-Проверяем:
-
-```bash
-# Агент должен работать на каждой ноде
-kubectl get pods -n caretta
-
-# Метрики Caretta появились в vmsingle (main-метрика — caretta_links_observed)
-kubectl run curl --rm -it --image=curlimages/curl -n vmks --restart=Never -- \
-  curl -s http://vmsingle-vmks-victoria-metrics-k8s-stack.vmks.svc:8429/api/v1/query \
-  --data-urlencode 'query=count(caretta_links_observed)'
-```
-
-После установки откройте в Radar экран **Traffic**: Caretta детектится автоматически (по подам с лейблом `app.kubernetes.io/name=caretta`), и карта заполнится живыми рёбрами — кто с кем реально говорит прямо сейчас. Метрики `caretta_links_observed` видны и в общей Grafana: Explore → datasource VictoriaMetrics.
+Откройте в Radar экран **Traffic**: Hubble детектится автоматически, и карта заполнится живыми рёбрами — кто с кем реально говорит прямо сейчас. Дополнительно Hubble даёт то, чего нет у метрических источников: dropped flows с указанием NetworkPolicy, которая заблокировала трафик, отображаются прямо на карте и коррелируются с политиками в Topology.
 
 ## Часть 2. In-cluster деплой в Yandex Managed K8s
 
@@ -190,13 +184,18 @@ ingress:
           pathType: Prefix
 
 rbac:
-  podLogs: true    # просмотр логов подов (включён по умолчанию)
-  podExec: false   # терминал в подах — включайте осознанно
-  secrets: false   # чтение Secrets — выключено по умолчанию
-  helm: false      # Helm write-операции — выключено по умолчанию
+  podLogs: true     # просмотр логов подов (включён по умолчанию)
+  podExec: false    # терминал в подах — включайте осознанно
+  secrets: false    # чтение Secrets — выключено по умолчанию
+  helm: false       # Helm write-операции — выключено по умолчанию
+  portForward: true # port-forward к hubble-relay — источник данных Traffic-карты (Cilium)
 
 timeline:
   storage: memory
+
+# Источник данных Traffic-карты — Hubble Relay (Cilium, туннельный режим кластера):
+# Radar детектит поды с лейблом k8s-app=hubble-relay и подключается через port-forward,
+# Prometheus-бэкенд не используется.
 
 resources:
   limits:
@@ -305,7 +304,7 @@ Diff любых двух ресурсов одного вида side-by-side: st
 - Beyla даёт eBPF L4 + HTTP видимость без service mesh
 - Setup wizard: если источник не найден — предложит установить
 
-В этом кластере источник — Caretta (раздел выше): Radar видит его поды и читает `caretta_links_observed` из vmsingle через `traffic.prometheusUrl`. Рёбра графа утолщаются с ростом throughput и тускнеют, когда трафик останавливается; hover по ребру — p50/p95/p99 latency и top status codes.
+В этом кластере источник — Hubble (раздел выше): Radar детектит hubble-relay в `kube-system` и читает поток сетевых событий через port-forward. Рёбра графа утолщаются с ростом throughput и тускнеют, когда трафик останавливается; hover по ребру — p50/p95/p99 latency и top status codes. Дропнутые потоки отображаются с причиной (например, `POLICY_DENIED`) и коррелируются с NetworkPolicy, которая их заблокировала.
 
 ### Capacity (Karpenter)
 
@@ -402,10 +401,12 @@ Read-only каталог: `issues` («что сломано прямо сейч�
 |------|----------|--------------|
 | Просмотр логов | `rbac.podLogs: true` | ✅ включён |
 | Терминал в подах | `rbac.podExec: true` | ❌ выключен |
-| Port forwarding | `rbac.portForward: true` | ❌ выключен |
+| Port forwarding | `rbac.portForward: true` | ✅ включён (нужен для Traffic-карты через Hubble) |
 | Чтение Secrets | `rbac.secrets: true` | ❌ выключен |
 | Helm write (upgrade/rollback/uninstall) | `rbac.helm: true` | ❌ выключен |
 | RBAC-объекты в браузере | `rbac.viewRBAC: true` | ❌ выключен |
+
+Port forwarding здесь включён осознанно: это единственный способ in-cluster Radar читать поток Hubble Relay. Право даёт только `pods/portforward` — `create` на порт-форварды, без exec и логов.
 
 Radar умеет graceful degradation: namespace-scoped ServiceAccount полностью поддерживается — что можете листать, то и видите; недоступные типы показывают copyable-сниппет ClusterRole для кластер-админа вместо вранья «0 found».
 
@@ -426,9 +427,9 @@ persistence:
 
 Ограничение: `replicaCount` обязан быть 1 (чарт упадёт с ошибкой, если совместить PVC + SQLite с несколькими репликами). Контроль очистки — через `/api/diagnostics`: `timeline.storageBytes`, `timeline.lastCleanupDeletedRows`, `timeline.lastCleanupError`.
 
-## Подключение Prometheus (Traffic и Cost)
+## Подключение Prometheus (Cost Insights)
 
-Для Traffic-карты и Cost Insights нужен Prometheus или VictoriaMetrics. Если автодетект не находит инстанс, укажите URL явно — в этой статье бэкенд ставится разделом выше (vmsingle в namespace `vmks`):
+Для Cost Insights нужен Prometheus или VictoriaMetrics. Если автодетект не находит инстанс, укажите URL явно — в этой статье бэкенд ставится разделом выше (vmsingle в namespace `vmks`). Traffic-карта этот URL не использует: её источник — Hubble:
 
 ```yaml
 traffic:
@@ -446,7 +447,7 @@ traffic:
 - Radar читает кластер через ваш kubeconfig / ServiceAccount и держит данные локально — ничего не выгружается в Skyhook
 - Account, agent, cloud-backend не нужны
 - In-cluster обязательно ставьте за аутентификацией: basic auth на ingress, встроенные proxy/OIDC-режимы
-- Terminal и port forwarding — значительный доступ, включайте только в доверенной среде
+- Terminal — значительный доступ, включайте только в доверенной среде; port forwarding в этой конфигурации включён только для чтения потока Hubble Relay (Traffic-карта)
 - Privileged-фичи по умолчанию выключены, всё включается явным `rbac.*` флагом
 
 ## Заключение
