@@ -1,7 +1,5 @@
-data "yandex_client_config" "client" {}
-
 locals {
-  folder_id  = data.yandex_client_config.client.folder_id
+  folder_id  = var.folder_id
   network_id = yandex_vpc_network.radar.id
 
   subnet_b_id   = yandex_vpc_subnet.radar-b.id
