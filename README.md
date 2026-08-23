@@ -146,7 +146,7 @@ Traffic-карта рисует живые сетевые потоки межд�
 - Hubble из коробки: наблюдаемость сетевых событий (dropped flows, correlation с NetworkPolicies)
 - Для сервисного аккаунта кластера обязательна роль `k8s.tunnelClusters.agent`
 
-Для подключения Radar к hubble-relay в `radar-values.yaml` включён `rbac.portForward: true`: Radar детектит поды с лейблом `k8s-app=hubble-relay` и читает поток событий через port-forward. Prometheus-бэкенд для Traffic-карты при этом не используется.
+Для подключения Radar к hubble-relay в `radar-values.yaml` включён `rbac.portForward: true`: Radar детектит поды с лейблом `k8s-app=hubble-relay` и читает поток событий через port-forward. Prometheus-бэкенд для Traffic-карты при этом не используется. Важно: это право активировано только для Hubble — как пользовательская фича port forwarding не включён, сделать port-forward на произвольный под через UI нельзя.
 
 Проверяем после создания кластера:
 
@@ -198,7 +198,7 @@ rbac:
   podExec: false    # терминал в подах — включайте осознанно
   secrets: false    # чтение Secrets — выключено по умолчанию
   helm: false       # Helm write-операции — выключено по умолчанию
-  portForward: true # port-forward к hubble-relay — источник данных Traffic-карты (Cilium)
+  portForward: true # активирован только для Hubble Relay (Traffic-карта); port-forward через UI не включён
 
 timeline:
   storage: memory
@@ -413,14 +413,14 @@ Read-only каталог: `issues` («что сломано прямо сейч�
 |------|----------|--------------|
 | Просмотр логов | `rbac.podLogs: true` | ✅ включён |
 | Терминал в подах | `rbac.podExec: true` | ❌ выключен |
-| Port forwarding | `rbac.portForward: true` | ✅ включён (нужен для Traffic-карты через Hubble) |
+| Port forwarding | `rbac.portForward: true` | ✅ включён (активирован только для Hubble — Traffic-карта) |
 | Чтение Secrets | `rbac.secrets: true` | ❌ выключен |
 | Helm write (upgrade/rollback/uninstall) | `rbac.helm: true` | ❌ выключен |
 | RBAC-объекты в браузере | `rbac.viewRBAC: true` | ❌ выключен |
 
 Чтение Secrets — не только про сами Secrets в браузере: без него не работает и список Helm-релизов (см. раздел [Helm](#helm)).
 
-Port forwarding здесь включён осознанно: это единственный способ in-cluster Radar читать поток Hubble Relay. Право даёт только `pods/portforward` — `create` на порт-форварды, без exec и логов.
+Port forwarding здесь включён осознанно, и активирован он только для Hubble: это единственный способ in-cluster Radar читать поток Hubble Relay. Право даёт только `pods/portforward` — `create` на порт-форварды, без exec и логов. Port forwarding как пользовательская фича через UI не включён: сделать port-forward на произвольный под из браузера нельзя.
 
 Radar умеет graceful degradation: namespace-scoped ServiceAccount полностью поддерживается — что можете листать, то и видите; недоступные типы показывают copyable-сниппет ClusterRole для кластер-админа вместо вранья «0 found».
 
@@ -461,7 +461,7 @@ traffic:
 - Radar читает кластер через ваш kubeconfig / ServiceAccount и держит данные локально — ничего не выгружается в Skyhook
 - Account, agent, cloud-backend не нужны
 - In-cluster обязательно ставьте за аутентификацией: basic auth на ingress, встроенные proxy/OIDC-режимы
-- Terminal — значительный доступ, включайте только в доверенной среде; port forwarding в этой конфигурации включён только для чтения потока Hubble Relay (Traffic-карта)
+- Terminal — значительный доступ, включайте только в доверенной среде; port forwarding в этой конфигурации активирован только для чтения потока Hubble Relay (Traffic-карта), через UI port-forward сделать нельзя
 - Privileged-фичи по умолчанию выключены, всё включается явным `rbac.*` флагом
 
 ## Заключение
