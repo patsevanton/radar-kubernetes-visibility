@@ -159,18 +159,6 @@ kubectl get pods -n kube-system | grep -E 'cilium|hubble'
 
 ## Часть 1. In-cluster деплой в Yandex Managed K8s
 
-Локальный режим удобен одному человеку. Для командной работы Radar разворачивается в кластер: один под, ClusterIP-сервис, ingress — и весь отдел видит кластер в браузере.
-
-Архитектура до неприличия простая:
-
-```
-Браузер ──HTTPS──► ingress-nginx ──► Service (ClusterIP :9280) ──► Pod radar
-                                                                          │
-                                                                    K8s API (in-cluster SA)
-```
-
-Никакой базы данных, никаких зависимостей. По умолчанию — один реплика-под (128 MiB request, 512 MiB limit).
-
 ### Шаг 1. Добавляем Helm-репозиторий
 
 ```bash
