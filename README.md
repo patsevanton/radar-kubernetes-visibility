@@ -138,7 +138,7 @@ kubectl exec -n vmks deploy/vmsingle-vmks-victoria-metrics-k8s-stack -- \
 
 ## Hubble (Cilium): источник данных для Traffic-карты
 
-Traffic-карта рисует живые сетевые потоки между сервисами. Radar умеет собирать их из Hubble (Cilium), Istio, Caretta или Grafana Beyla. В этом кластере используется Hubble: кластер создаётся в туннельном режиме Cilium (`network_implementation { cilium {} }` в Terraform), и Yandex Managed K8s сам ставит Cilium и Hubble Relay в `kube-system` — ничего дополнительно устанавливать не нужно.
+Traffic-карта рисует живые сетевые потоки между сервисами. Radar умеет собирать их из [Hubble (Cilium)](https://github.com/cilium/hubble), [Istio](https://github.com/istio/istio), [Caretta](https://github.com/aicoe-aiops/caretta) или [Grafana Beyla](https://github.com/grafana/beyla). В этом кластере используется Hubble: кластер создаётся в туннельном режиме Cilium (`network_implementation { cilium {} }` в Terraform), и Yandex Managed K8s сам ставит Cilium и Hubble Relay в `kube-system` — ничего дополнительно устанавливать не нужно.
 
 Туннельный режим Cilium (VxLAN):
 
