@@ -3,8 +3,14 @@
 # игнорирует (https://github.com/opencost/opencost/issues/2925), поэтому создаём
 # свой с плоскими ключами и подключаем через opencost.customPricing.createConfigmap: false.
 # Применить ДО установки чарта OpenCost, иначе cost-model стартует с дефолтными ценами.
-# Ключи должны совпадать с полями Go-структуры CustomPricing (с маленькой первой буквой),
-# иначе OpenCost их проигнорирует. Для CPU, RAM, storage OpenCost делит значение на 730.
+# Ключи должны совпадать с полями Go-структуры CustomPricing (с маленькой первой буквы),
+# иначе OpenCost их проигнорирует.
+#
+# ВАЖНО про размерность CPU/RAM/storage (pkg/cloud/provider/providerconfig.go):
+#   * OpenCost >= 1.121.0 (включая 1.121.1 из README) — значения применяются КАК ЕСТЬ,
+#     т.е. указывайте ПОЧАСОВЫЕ ставки (₽/час за единицу).
+#   * OpenCost <= 1.120.0 — cost-model делила CPU/RAM/GPU/storage на 730, т.е. ожидались
+#     МЕСЯЧНЫЕ ставки (₽/мес). При откате на <= 1.120.0 умножьте значения ниже на 730.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -14,14 +20,14 @@ data:
   provider: "custom"
   currencyCode: "RUB"
   description: "Yandex Cloud тарифы (₽)"
-  # Месячные ставки (₽/мес за единицу) — OpenCost делит на 730 → почасовая ставка.
-  # CPU: 1.1529 ₽/vCPU-час (100% vCPU) × 730; RAM: 0.3074 ₽/ГБ-час × 730.
-  CPU: "841.617"
-  RAM: "224.402"
-  # 0.004453 ₽/ГБ-час (Стандартный диск HDD) × 730. Ноды используют network-ssd —
+  # Почасовые ставки (₽/час за единицу) для OpenCost >= 1.121.0:
+  # CPU — 1.1529 ₽/vCPU-час (100% vCPU), RAM — 0.3074 ₽/ГБ-час.
+  CPU: "1.1529"
+  RAM: "0.3074"
+  # 0.004453 ₽/ГБ-час (Стандартный диск HDD). Ноды используют network-ssd —
   # при желании подставьте ставку SSD (см. scripts/fetch_yandex_sku_prices.py в opencost-yandex-cloud).
-  storage: "3.251"
-  # Сеть: стоимость за 1 GiB egress (₽/GiB). OpenCost НЕ делит на 730.
+  storage: "0.004453"
+  # Сеть: стоимость за 1 GiB egress (₽/GiB).
   zoneNetworkEgress: "0"
   regionNetworkEgress: "0"
   internetNetworkEgress: "1.68" # ₽/GiB (исходящий трафик, стандартный тариф 10 ГБ – 1 ТБ)
