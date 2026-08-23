@@ -44,18 +44,6 @@ kubeScheduler:
 kubeEtcd:
   enabled: false
 
-vmsingle:
-  enabled: true
-  spec:
-    storage:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: yc-network-hdd
-          accessModes: ["ReadWriteOnce"]
-          resources:
-            requests:
-              storage: 33Gi
-
 # Алерты не ставим: Radar не отображает firing-алерты Alertmanager'а,
 # а ресурсов демо-кластера мало. Алерты — в Grafana UI при необходимости.
 vmalert:
