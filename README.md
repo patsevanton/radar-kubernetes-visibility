@@ -1,4 +1,4 @@
-# Radar: Kubernetes UI, которого не хватало — разворачиваем в Yandex Managed K8s за 10 минут
+# Radar: Kubernetes UI, которого не хватало
 
 ## Введение
 
